@@ -6,6 +6,7 @@ import {
   dedupeSimilarQuestionsInBank,
   deleteUserQuestionnaireItem,
   listBankQuestions,
+  listDismissedQuestionIds,
   listUserQuestionnaire,
   syncQuestionnaireContextToProfile,
   updateUserQuestionnaireAnswer,
@@ -54,6 +55,16 @@ export async function analyzeQuestionnaireAction(): Promise<
       };
     }
 
+    const dismissedIds = await listDismissedQuestionIds(session.userId);
+    const questions = bank.filter((item) => !dismissedIds.has(item.id));
+    if (!questions.length) {
+      return {
+        ok: false,
+        error:
+          "All bank questions were removed from your list. New ones appear when future applications add them.",
+      };
+    }
+
     const profile = await getUserProfile(session.userId);
     const resumeData = buildResumeProfileText(profile);
     if (!resumeData.trim()) {
@@ -64,12 +75,12 @@ export async function analyzeQuestionnaireAction(): Promise<
     }
 
     const answered = await analyzeQuestionnaire({
-      questions: bank.map((item) => item.question),
+      questions: questions.map((item) => item.question),
       resumeData,
     });
 
     const byQuestion = new Map(
-      bank.map((item) => [item.question.trim().toLowerCase(), item.id]),
+      questions.map((item) => [item.question.trim().toLowerCase(), item.id]),
     );
 
     const payload = answered

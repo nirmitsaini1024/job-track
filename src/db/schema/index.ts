@@ -109,6 +109,30 @@ export const userQuestionnaireItems = pgTable(
   ],
 );
 
+export const userQuestionnaireDismissals = pgTable(
+  "user_questionnaire_dismissals",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    questionId: uuid("question_id")
+      .notNull()
+      .references(() => questionnaireQuestions.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("user_questionnaire_dismissals_user_question_idx").on(
+      table.userId,
+      table.questionId,
+    ),
+    index("user_questionnaire_dismissals_user_id_idx").on(table.userId),
+    index("user_questionnaire_dismissals_question_id_idx").on(table.questionId),
+  ],
+);
+
 export const applicationStatusEnum = pgEnum("application_status", [
   "SAVED",
   "APPLIED",
@@ -270,6 +294,27 @@ export const communications = pgTable(
   ],
 );
 
+export const applicationAttachments = pgTable(
+  "application_attachments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    applicationId: uuid("application_id")
+      .notNull()
+      .references(() => applications.id, { onDelete: "cascade" }),
+    url: text("url").notNull(),
+    fileId: text("file_id").notNull(),
+    name: text("name").notNull(),
+    mimeType: text("mime_type").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("application_attachments_application_id_idx").on(table.applicationId),
+    index("application_attachments_created_at_idx").on(table.createdAt),
+  ],
+);
+
 export const usersRelations = relations(users, ({ one, many }) => ({
   profile: one(userProfiles, {
     fields: [users.id],
@@ -277,6 +322,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   }),
   applications: many(applications),
   questionnaireItems: many(userQuestionnaireItems),
+  questionnaireDismissals: many(userQuestionnaireDismissals),
 }));
 
 export const userProfilesRelations = relations(userProfiles, ({ one }) => ({
@@ -307,6 +353,20 @@ export const userQuestionnaireItemsRelations = relations(
   }),
 );
 
+export const userQuestionnaireDismissalsRelations = relations(
+  userQuestionnaireDismissals,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [userQuestionnaireDismissals.userId],
+      references: [users.id],
+    }),
+    question: one(questionnaireQuestions, {
+      fields: [userQuestionnaireDismissals.questionId],
+      references: [questionnaireQuestions.id],
+    }),
+  }),
+);
+
 export const applicationsRelations = relations(applications, ({ one, many }) => ({
   owner: one(users, {
     fields: [applications.ownerId],
@@ -315,7 +375,18 @@ export const applicationsRelations = relations(applications, ({ one, many }) => 
   skills: many(applicationSkills),
   events: many(applicationEvents),
   communications: many(communications),
+  attachments: many(applicationAttachments),
 }));
+
+export const applicationAttachmentsRelations = relations(
+  applicationAttachments,
+  ({ one }) => ({
+    application: one(applications, {
+      fields: [applicationAttachments.applicationId],
+      references: [applications.id],
+    }),
+  }),
+);
 
 export const applicationSkillsRelations = relations(
   applicationSkills,
@@ -355,6 +426,7 @@ export type NewApplication = typeof applications.$inferInsert;
 export type ApplicationSkill = typeof applicationSkills.$inferSelect;
 export type ApplicationEvent = typeof applicationEvents.$inferSelect;
 export type Communication = typeof communications.$inferSelect;
+export type ApplicationAttachment = typeof applicationAttachments.$inferSelect;
 
 export type ApplicationStatus = (typeof applicationStatusEnum.enumValues)[number];
 export type RemoteType = (typeof remoteTypeEnum.enumValues)[number];

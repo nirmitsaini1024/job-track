@@ -28,6 +28,7 @@ export const ALLOWED_IMAGE_TYPES = [
 ] as const;
 
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+export const MAX_APPLICATION_ATTACHMENTS = 12;
 
 export const STATUS_LABELS: Record<(typeof APPLICATION_STATUSES)[number], string> =
   {

@@ -10,6 +10,7 @@ import {
 } from "@/db/schema";
 import { isEligibleForGhost, isGhosted, GHOST_THRESHOLD_DAYS } from "@/lib/ghosted";
 import type { ApplicationFilters } from "@/lib/validations/application";
+import { listApplicationAttachments } from "@/db/queries/attachments";
 
 export type SerializedApplication = {
   id: string;
@@ -242,7 +243,7 @@ export async function getApplication(id: string, ownerId?: string) {
 
   if (!row) return null;
 
-  const [skills, events, comms] = await Promise.all([
+  const [skills, events, comms, attachments] = await Promise.all([
     db
       .select()
       .from(applicationSkills)
@@ -257,6 +258,7 @@ export async function getApplication(id: string, ownerId?: string) {
       .from(communications)
       .where(eq(communications.applicationId, id))
       .orderBy(desc(communications.createdAt)),
+    listApplicationAttachments(id),
   ]);
 
   return {
@@ -281,6 +283,7 @@ export async function getApplication(id: string, ownerId?: string) {
       aiReasoning: item.aiReasoning,
       createdAt: item.createdAt.toISOString(),
     })),
+    attachments,
   };
 }
 
@@ -321,6 +324,11 @@ export async function createApplication(
 }
 
 export async function deleteApplication(id: string) {
+  const { deleteAttachmentsForApplication } = await import(
+    "@/db/queries/attachments"
+  );
+  await deleteAttachmentsForApplication(id);
+
   const db = getDb();
   const [deleted] = await db
     .delete(applications)

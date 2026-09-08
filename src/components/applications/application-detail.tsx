@@ -4,6 +4,7 @@ import { StatusSelector } from "@/components/applications/status-selector";
 import { DeleteApplicationButton } from "@/components/applications/delete-application-button";
 import { ApplicationTimeline } from "@/components/applications/application-timeline";
 import { NoteForm } from "@/components/applications/note-form";
+import { ApplicationScreenshots } from "@/components/applications/application-screenshots";
 import { EmailAnalyzer } from "@/components/ai/email-analyzer";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -196,7 +197,7 @@ export function ApplicationDetail({ application }: { application: Detail }) {
         </CardContent>
       </Card>
 
-      <Card className="rounded-lg">
+      <Card>
         <CardHeader>
           <CardTitle>Notes</CardTitle>
         </CardHeader>
@@ -204,6 +205,11 @@ export function ApplicationDetail({ application }: { application: Detail }) {
           <NoteForm applicationId={application.id} />
         </CardContent>
       </Card>
+
+      <ApplicationScreenshots
+        applicationId={application.id}
+        initialAttachments={application.attachments ?? []}
+      />
     </div>
   );
 }

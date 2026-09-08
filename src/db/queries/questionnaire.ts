@@ -2,6 +2,7 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 import {
   getDb,
   questionnaireQuestions,
+  userQuestionnaireDismissals,
   userQuestionnaireItems,
   userProfiles,
 } from "@/db";
@@ -148,6 +149,35 @@ export async function dedupeSimilarQuestionsInBank() {
         }
       }
 
+      const dupDismissals = await db
+        .select()
+        .from(userQuestionnaireDismissals)
+        .where(eq(userQuestionnaireDismissals.questionId, dup.id));
+
+      for (const dismissal of dupDismissals) {
+        const [existing] = await db
+          .select()
+          .from(userQuestionnaireDismissals)
+          .where(
+            and(
+              eq(userQuestionnaireDismissals.userId, dismissal.userId),
+              eq(userQuestionnaireDismissals.questionId, keeper.id),
+            ),
+          )
+          .limit(1);
+
+        if (existing) {
+          await db
+            .delete(userQuestionnaireDismissals)
+            .where(eq(userQuestionnaireDismissals.id, dismissal.id));
+        } else {
+          await db
+            .update(userQuestionnaireDismissals)
+            .set({ questionId: keeper.id })
+            .where(eq(userQuestionnaireDismissals.id, dismissal.id));
+        }
+      }
+
       await db
         .delete(questionnaireQuestions)
         .where(eq(questionnaireQuestions.id, dup.id));
@@ -273,11 +303,64 @@ export async function updateUserQuestionnaireAnswer(
   return updated ?? null;
 }
 
+export async function listDismissedQuestionIds(userId: string) {
+  const db = getDb();
+  const rows = await db
+    .select({ questionId: userQuestionnaireDismissals.questionId })
+    .from(userQuestionnaireDismissals)
+    .where(eq(userQuestionnaireDismissals.userId, userId));
+  return new Set(rows.map((row) => row.questionId));
+}
+
+export async function dismissQuestionnaireQuestion(
+  userId: string,
+  questionId: string,
+) {
+  const db = getDb();
+  const [existing] = await db
+    .select()
+    .from(userQuestionnaireDismissals)
+    .where(
+      and(
+        eq(userQuestionnaireDismissals.userId, userId),
+        eq(userQuestionnaireDismissals.questionId, questionId),
+      ),
+    )
+    .limit(1);
+
+  if (existing) return existing;
+
+  const [created] = await db
+    .insert(userQuestionnaireDismissals)
+    .values({
+      userId,
+      questionId,
+      createdAt: new Date(),
+    })
+    .returning();
+  return created;
+}
+
 export async function deleteUserQuestionnaireItem(
   userId: string,
   itemId: string,
 ) {
   const db = getDb();
+  const [existing] = await db
+    .select()
+    .from(userQuestionnaireItems)
+    .where(
+      and(
+        eq(userQuestionnaireItems.id, itemId),
+        eq(userQuestionnaireItems.userId, userId),
+      ),
+    )
+    .limit(1);
+
+  if (!existing) return null;
+
+  await dismissQuestionnaireQuestion(userId, existing.questionId);
+
   const [deleted] = await db
     .delete(userQuestionnaireItems)
     .where(

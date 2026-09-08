@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { createApplicationAction } from "@/actions/applications";
+import { uploadApplicationAttachmentsAction } from "@/actions/attachments";
 import type { JobExtraction } from "@/lib/ai";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -95,7 +96,8 @@ function validateImage(file: File): string | null {
 export function JobAnalyzer() {
   const router = useRouter();
   const [text, setText] = useState("");
-  const [images, setImages] = useState<PastedImage[]>([]);
+  const [analyzeImages, setAnalyzeImages] = useState<PastedImage[]>([]);
+  const [storeImages, setStoreImages] = useState<PastedImage[]>([]);
   const [source, setSource] = useState("");
   const [applicationUrl, setApplicationUrl] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
@@ -105,11 +107,14 @@ export function JobAnalyzer() {
   const [skillDraft, setSkillDraft] = useState("");
 
   const canAnalyze = useMemo(
-    () => text.trim().length > 0 || images.length > 0,
-    [text, images],
+    () => text.trim().length > 0 || analyzeImages.length > 0,
+    [text, analyzeImages],
   );
 
-  function addFiles(files: File[]) {
+  function addFiles(
+    files: File[],
+    setList: React.Dispatch<React.SetStateAction<PastedImage[]>>,
+  ) {
     const next: PastedImage[] = [];
     for (const file of files) {
       const validationError = validateImage(file);
@@ -124,19 +129,22 @@ export function JobAnalyzer() {
       });
     }
     if (next.length) {
-      setImages((current) => [...current, ...next]);
+      setList((current) => [...current, ...next]);
     }
   }
 
-  function removeImage(id: string) {
-    setImages((current) => {
+  function removeImage(
+    id: string,
+    setList: React.Dispatch<React.SetStateAction<PastedImage[]>>,
+  ) {
+    setList((current) => {
       const target = current.find((image) => image.id === id);
       if (target) URL.revokeObjectURL(target.preview);
       return current.filter((image) => image.id !== id);
     });
   }
 
-  async function onPaste(event: React.ClipboardEvent<HTMLTextAreaElement>) {
+  async function onAnalyzePaste(event: React.ClipboardEvent<HTMLTextAreaElement>) {
     const items = Array.from(event.clipboardData.items);
     const imageFiles: File[] = [];
 
@@ -151,13 +159,29 @@ export function JobAnalyzer() {
       if (pastedText) {
         setText((current) => (current ? `${current}\n${pastedText}` : pastedText));
       }
-      addFiles(imageFiles);
+      addFiles(imageFiles, setAnalyzeImages);
       toast.success(
         imageFiles.length === 1
-          ? "Image pasted"
-          : `${imageFiles.length} images pasted`,
+          ? "Image added for AI analysis"
+          : `${imageFiles.length} images added for AI analysis`,
       );
     }
+  }
+
+  async function onStorePaste(event: React.ClipboardEvent<HTMLDivElement>) {
+    const files = Array.from(event.clipboardData.items)
+      .filter((item) => item.type.startsWith("image/"))
+      .map((item) => item.getAsFile())
+      .filter((file): file is File => Boolean(file));
+
+    if (!files.length) return;
+    event.preventDefault();
+    addFiles(files, setStoreImages);
+    toast.success(
+      files.length === 1
+        ? "Screenshot added to store"
+        : `${files.length} screenshots added to store`,
+    );
   }
 
   async function analyze() {
@@ -168,7 +192,7 @@ export function JobAnalyzer() {
       form.set("text", text);
       form.set("source", source);
       form.set("applicationUrl", applicationUrl);
-      for (const image of images) {
+      for (const image of analyzeImages) {
         form.append("images", image.file);
       }
 
@@ -272,12 +296,36 @@ export function JobAnalyzer() {
       skills: review.skills,
       questionAnswers,
     });
-    setSaving(false);
+
     if (!result.ok) {
+      setSaving(false);
       toast.error(result.error);
       return;
     }
-    toast.success("Application saved");
+
+    if (storeImages.length) {
+      const form = new FormData();
+      form.set("applicationId", result.data.id);
+      for (const image of storeImages) {
+        form.append("images", image.file);
+      }
+      const upload = await uploadApplicationAttachmentsAction(form);
+      if (!upload.ok) {
+        setSaving(false);
+        toast.error(
+          `Application saved, but screenshots failed: ${upload.error}`,
+        );
+        router.push(`/applications/${result.data.id}`);
+        return;
+      }
+    }
+
+    setSaving(false);
+    toast.success(
+      storeImages.length
+        ? "Application and screenshots saved"
+        : "Application saved",
+    );
     router.push(`/applications/${result.data.id}`);
   }
 
@@ -289,10 +337,18 @@ export function JobAnalyzer() {
             Review extracted details
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Correct anything the AI missed, then save. Question answers are based
-            on your profile resume data.
+            Correct anything the AI missed, then save. Add store-only screenshots
+            below if you want them kept on this application.
           </p>
         </div>
+
+        <ImageStoreSection
+          images={storeImages}
+          onAdd={(files) => addFiles(files, setStoreImages)}
+          onRemove={(id) => removeImage(id, setStoreImages)}
+          onPaste={onStorePaste}
+        />
+
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Company">
             <Input
@@ -547,20 +603,19 @@ export function JobAnalyzer() {
       <div>
         <h1 className="text-xl font-medium tracking-tight">Add application</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Paste the job description AND any application form questions (or
-          screenshots of the form). AI extracts the role and drafts answers from
-          your profile resume.
+          Use the top section for AI (text + optional analysis screenshots). Use
+          “Screenshots to store” for images you want saved with the application.
         </p>
       </div>
 
       <div className="grid gap-3">
-        <Field label="Job description & questions">
+        <Field label="Job description & questions (for AI)">
           <Textarea
             rows={14}
             value={text}
             onChange={(e) => setText(e.target.value)}
-            onPaste={onPaste}
-            placeholder="Paste job description here. If the application has essay questions (hardest project, inspiration, pitch, etc.), paste those too — or paste screenshots of the form (Ctrl/Cmd+V)."
+            onPaste={onAnalyzePaste}
+            placeholder="Paste job description and form questions here. Paste screenshots here only if you want AI to read them."
           />
         </Field>
 
@@ -571,23 +626,23 @@ export function JobAnalyzer() {
             multiple
             className="max-w-xs"
             onChange={(e) => {
-              addFiles(Array.from(e.target.files ?? []));
+              addFiles(Array.from(e.target.files ?? []), setAnalyzeImages);
               e.target.value = "";
             }}
           />
           <p className="text-sm text-muted-foreground">
-            Or paste images into the box · JPEG/PNG/WebP/GIF · max 5MB each
+            AI analysis images · not stored
           </p>
         </div>
 
-        {images.length > 0 ? (
+        {analyzeImages.length > 0 ? (
           <div className="grid gap-3 sm:grid-cols-2">
-            {images.map((image) => (
-              <div key={image.id} className="relative overflow-hidden rounded-lg border">
+            {analyzeImages.map((image) => (
+              <div key={image.id} className="relative overflow-hidden rounded-md border">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={image.preview}
-                  alt="Pasted job content"
+                  alt="AI analysis image"
                   className="max-h-56 w-full object-contain bg-muted/30"
                 />
                 <Button
@@ -595,7 +650,7 @@ export function JobAnalyzer() {
                   size="sm"
                   variant="secondary"
                   className="absolute top-2 right-2"
-                  onClick={() => removeImage(image.id)}
+                  onClick={() => removeImage(image.id, setAnalyzeImages)}
                 >
                   Remove
                 </Button>
@@ -604,6 +659,13 @@ export function JobAnalyzer() {
           </div>
         ) : null}
       </div>
+
+      <ImageStoreSection
+        images={storeImages}
+        onAdd={(files) => addFiles(files, setStoreImages)}
+        onRemove={(id) => removeImage(id, setStoreImages)}
+        onPaste={onStorePaste}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Job URL (optional)">
@@ -626,6 +688,80 @@ export function JobAnalyzer() {
         <Button onClick={analyze} disabled={!canAnalyze || analyzing}>
           {analyzing ? "Analyzing with AI…" : "Analyze with AI"}
         </Button>
+      </div>
+    </div>
+  );
+}
+
+function ImageStoreSection({
+  images,
+  onAdd,
+  onRemove,
+  onPaste,
+}: {
+  images: PastedImage[];
+  onAdd: (files: File[]) => void;
+  onRemove: (id: string) => void;
+  onPaste: (event: React.ClipboardEvent<HTMLDivElement>) => void;
+}) {
+  return (
+    <div className="grid gap-3 rounded-md border p-4">
+      <div>
+        <p className="text-sm font-medium">Screenshots to store</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Saved with the application. Not sent to AI. Click the box
+          and paste (Ctrl/Cmd+V), or upload.
+        </p>
+      </div>
+
+      <div
+        tabIndex={0}
+        onPaste={onPaste}
+        className="rounded-md border border-dashed p-4 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+      >
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            type="file"
+            accept={ALLOWED_IMAGE_TYPES.join(",")}
+            multiple
+            className="max-w-xs"
+            onChange={(e) => {
+              onAdd(Array.from(e.target.files ?? []));
+              e.target.value = "";
+            }}
+          />
+          <p className="text-sm text-muted-foreground">
+            Click this area and paste · JPEG/PNG/WebP/GIF · max 5MB each
+          </p>
+        </div>
+
+        {images.length > 0 ? (
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            {images.map((image) => (
+              <div key={image.id} className="relative overflow-hidden rounded-md border">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={image.preview}
+                  alt="Stored screenshot"
+                  className="max-h-56 w-full object-contain bg-muted/30"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  className="absolute top-2 right-2"
+                  onClick={() => onRemove(image.id)}
+                >
+                  Remove
+                </Button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-muted-foreground">
+            No store screenshots yet.
+          </p>
+        )}
       </div>
     </div>
   );
