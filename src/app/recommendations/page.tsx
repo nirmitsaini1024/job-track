@@ -1,6 +1,7 @@
 import { requireSession } from "@/lib/auth";
 import { listPendingRecommendationsForUser } from "@/db/queries/recommendations";
 import { RecommendationsFeed } from "@/components/recommendations/recommendations-feed";
+import { ShareJobForm } from "@/components/recommendations/share-job-form";
 
 export const dynamic = "force-dynamic";
 
@@ -24,18 +25,30 @@ export default async function RecommendationsPage() {
       <div>
         <h1 className="text-2xl font-medium tracking-tight">Recommendations</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Jobs others recommended for you. Save or apply to track them, or
-          remove them from this feed.
+          Share jobs with friends without applying yourself, and manage jobs
+          recommended to you.
         </p>
       </div>
 
-      {error ? (
-        <div className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">
-          {error}
+      <ShareJobForm />
+
+      <div className="grid gap-3">
+        <div>
+          <h2 className="text-lg font-medium tracking-tight">Your feed</h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            Jobs others recommended for you. Save or apply to track them, or
+            remove them from this feed.
+          </p>
         </div>
-      ) : (
-        <RecommendationsFeed items={items} />
-      )}
+
+        {error ? (
+          <div className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">
+            {error}
+          </div>
+        ) : (
+          <RecommendationsFeed items={items} />
+        )}
+      </div>
     </div>
   );
 }

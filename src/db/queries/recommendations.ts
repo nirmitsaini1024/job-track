@@ -26,6 +26,7 @@ export type SerializedRecommendation = {
   description: string;
   applicationUrl: string;
   source: string | null;
+  note: string | null;
   skills: string[];
   status: string;
   fromUsername: string;
@@ -35,22 +36,23 @@ export type SerializedRecommendation = {
 type RecommendationPayload = {
   fromUserId: string;
   toUserIds: string[];
-  sourceApplicationId: string;
+  sourceApplicationId?: string | null;
   company: string;
   position: string;
-  location: string | null;
-  remoteType: RemoteType;
-  employmentType: string | null;
-  salaryMin: number | null;
-  salaryMax: number | null;
-  salaryCurrency: string | null;
-  salaryPeriod: SalaryPeriod | null;
-  experienceMin: number | null;
-  experienceMax: number | null;
-  description: string;
+  location?: string | null;
+  remoteType?: RemoteType;
+  employmentType?: string | null;
+  salaryMin?: number | null;
+  salaryMax?: number | null;
+  salaryCurrency?: string | null;
+  salaryPeriod?: SalaryPeriod | null;
+  experienceMin?: number | null;
+  experienceMax?: number | null;
+  description?: string;
   applicationUrl: string;
-  source: string | null;
-  skills: string[];
+  source?: string | null;
+  note?: string | null;
+  skills?: string[];
 };
 
 function serialize(
@@ -73,6 +75,7 @@ function serialize(
     description: row.description,
     applicationUrl: row.applicationUrl,
     source: row.source,
+    note: row.note,
     skills: row.skills ?? [],
     status: row.status,
     fromUsername,
@@ -134,22 +137,23 @@ export async function createRecommendations(input: RecommendationPayload) {
       toCreate.map((user) => ({
         fromUserId: input.fromUserId,
         toUserId: user.id,
-        sourceApplicationId: input.sourceApplicationId,
-        company: input.company,
-        position: input.position,
-        location: input.location,
-        remoteType: input.remoteType,
-        employmentType: input.employmentType,
-        salaryMin: input.salaryMin,
-        salaryMax: input.salaryMax,
-        salaryCurrency: input.salaryCurrency,
-        salaryPeriod: input.salaryPeriod,
-        experienceMin: input.experienceMin,
-        experienceMax: input.experienceMax,
-        description: input.description,
+        sourceApplicationId: input.sourceApplicationId ?? null,
+        company: input.company.trim() || "Unknown",
+        position: input.position.trim(),
+        location: input.location ?? null,
+        remoteType: input.remoteType ?? "UNKNOWN",
+        employmentType: input.employmentType ?? null,
+        salaryMin: input.salaryMin ?? null,
+        salaryMax: input.salaryMax ?? null,
+        salaryCurrency: input.salaryCurrency ?? null,
+        salaryPeriod: input.salaryPeriod ?? null,
+        experienceMin: input.experienceMin ?? null,
+        experienceMax: input.experienceMax ?? null,
+        description: input.description ?? "",
         applicationUrl: input.applicationUrl.trim(),
-        source: input.source,
-        skills: input.skills,
+        source: input.source ?? null,
+        note: input.note?.trim() || null,
+        skills: input.skills ?? [],
         status: "PENDING" as const,
       })),
     )
@@ -251,7 +255,9 @@ export async function convertRecommendation(input: {
     salaryPeriod: row.salaryPeriod,
     experienceMin: row.experienceMin,
     experienceMax: row.experienceMax,
-    description: row.description,
+    description: [row.note ? `Note from @${fromUser?.username ?? "friend"}: ${row.note}` : null, row.description]
+      .filter(Boolean)
+      .join("\n\n"),
     applicationUrl: row.applicationUrl,
     source: fromUser?.username
       ? `Recommended by ${fromUser.username}`

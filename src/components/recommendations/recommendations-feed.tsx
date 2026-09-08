@@ -75,7 +75,9 @@ export function RecommendationsFeed({
                   From @{item.fromUsername}
                 </p>
                 <CardTitle className="text-lg">
-                  {item.position} at {item.company}
+                  {item.company && item.company !== "Unknown"
+                    ? `${item.position} at ${item.company}`
+                    : item.position}
                 </CardTitle>
               </div>
               <div className="flex items-center gap-2">
@@ -126,6 +128,14 @@ export function RecommendationsFeed({
             >
               {item.applicationUrl}
             </a>
+            {item.note ? (
+              <div className="rounded-md border bg-muted/40 px-3 py-2">
+                <p className="text-xs font-medium text-muted-foreground">Note</p>
+                <p className="mt-1 whitespace-pre-wrap text-sm leading-6">
+                  {item.note}
+                </p>
+              </div>
+            ) : null}
             {item.description ? (
               <p className="line-clamp-4 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
                 {item.description}

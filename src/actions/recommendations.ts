@@ -15,6 +15,7 @@ import {
   convertRecommendationSchema,
   recommendJobSchema,
   recommendationIdSchema,
+  shareJobRecommendationSchema,
 } from "@/lib/validations/recommendation";
 import type { RemoteType, SalaryPeriod } from "@/db/schema";
 
@@ -33,7 +34,7 @@ function fail(error: unknown, fallback: string): ActionResult<never> {
     if (error.message === "JOB_URL_REQUIRED") {
       return {
         ok: false,
-        error: "Add a job URL before recommending this application.",
+        error: "A job URL is required to recommend.",
       };
     }
     if (error.message === "NO_RECIPIENTS") {
@@ -125,6 +126,42 @@ export async function recommendJobAction(
     return { ok: true, data: result };
   } catch (error) {
     return fail(error, "Unable to recommend this job.");
+  }
+}
+
+export async function shareJobRecommendationAction(
+  input: unknown,
+): Promise<
+  ActionResult<{ created: number; skipped: string[]; usernames: string[] }>
+> {
+  try {
+    const session = await getSession();
+    if (!session?.userId) {
+      return { ok: false, error: "You must be signed in." };
+    }
+
+    const data = shareJobRecommendationSchema.parse(input);
+    if (!normalizeJobUrl(data.applicationUrl)) {
+      return { ok: false, error: "Enter a valid job URL." };
+    }
+
+    const result = await createRecommendations({
+      fromUserId: session.userId,
+      toUserIds: data.toUserIds,
+      sourceApplicationId: null,
+      company: data.company ?? "Unknown",
+      position: data.position,
+      applicationUrl: data.applicationUrl,
+      note: data.note ?? null,
+      source: "Shared link",
+      description: "",
+      skills: [],
+    });
+
+    revalidatePath("/recommendations");
+    return { ok: true, data: result };
+  } catch (error) {
+    return fail(error, "Unable to share this job.");
   }
 }
 

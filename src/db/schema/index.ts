@@ -349,6 +349,7 @@ export const jobRecommendations = pgTable(
     description: text("description").notNull().default(""),
     applicationUrl: text("application_url").notNull(),
     source: text("source"),
+    note: text("note"),
     skills: jsonb("skills").$type<string[]>().notNull().default([]),
     status: recommendationStatusEnum("status").notNull().default("PENDING"),
     convertedApplicationId: uuid("converted_application_id").references(
