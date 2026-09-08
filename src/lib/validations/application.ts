@@ -105,6 +105,10 @@ export const updateStatusSchema = z.object({
   status: applicationStatusSchema,
 });
 
+export const unmarkGhostedSchema = z.object({
+  id: z.string().uuid(),
+});
+
 export const addNoteSchema = z.object({
   applicationId: z.string().uuid(),
   note: z.string().trim().min(1).max(10000),

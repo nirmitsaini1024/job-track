@@ -2,6 +2,7 @@ import Link from "next/link";
 import { StatusBadge } from "@/components/applications/status-badge";
 import { StatusSelector } from "@/components/applications/status-selector";
 import { DeleteApplicationButton } from "@/components/applications/delete-application-button";
+import { UnmarkGhostedButton } from "@/components/applications/unmark-ghosted-button";
 import { ApplicationTimeline } from "@/components/applications/application-timeline";
 import { NoteForm } from "@/components/applications/note-form";
 import { ApplicationScreenshots } from "@/components/applications/application-screenshots";
@@ -43,9 +44,12 @@ export function ApplicationDetail({ application }: { application: Detail }) {
             ) : null}
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <StatusBadge status={application.status} />
           <StatusSelector applicationId={application.id} status={application.status} />
+          {application.isGhosted ? (
+            <UnmarkGhostedButton applicationId={application.id} />
+          ) : null}
           <DeleteApplicationButton
             applicationId={application.id}
             company={application.company}

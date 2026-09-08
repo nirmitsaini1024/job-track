@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/table";
 import { StatusBadge } from "@/components/applications/status-badge";
 import { DeleteApplicationButton } from "@/components/applications/delete-application-button";
+import { UnmarkGhostedButton } from "@/components/applications/unmark-ghosted-button";
 import { formatDate, formatRelative, formatSalary } from "@/lib/format";
 import type { SerializedApplication } from "@/db/queries/applications";
 import { Badge } from "@/components/ui/badge";
@@ -111,12 +112,20 @@ export function ApplicationsTable({
               </TableCell>
               <TableCell className="align-top">
                 {item.isGhosted ? (
-                  <Badge
-                    variant="outline"
-                    className="text-amber-700 dark:text-amber-300"
-                  >
-                    Ghosted
-                  </Badge>
+                  <div className="flex flex-col items-start gap-1.5">
+                    <Badge
+                      variant="outline"
+                      className="text-amber-700 dark:text-amber-300"
+                    >
+                      Ghosted
+                    </Badge>
+                    <UnmarkGhostedButton
+                      applicationId={item.id}
+                      size="sm"
+                      variant="ghost"
+                      label="Unmark"
+                    />
+                  </div>
                 ) : (
                   <span className="text-muted-foreground">—</span>
                 )}

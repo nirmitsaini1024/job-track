@@ -557,3 +557,34 @@ export async function markStaleApplicationsGhosted(ownerId: string) {
 
   return { marked: ids.length, ids };
 }
+
+export async function unmarkApplicationGhosted(id: string) {
+  const db = getDb();
+  const [current] = await db
+    .select()
+    .from(applications)
+    .where(eq(applications.id, id))
+    .limit(1);
+
+  if (!current) return null;
+
+  const now = new Date();
+  const [updated] = await db
+    .update(applications)
+    .set({
+      ghosted: false,
+      lastActivityAt: now,
+      updatedAt: now,
+    })
+    .where(eq(applications.id, id))
+    .returning();
+
+  await db.insert(applicationEvents).values({
+    applicationId: id,
+    type: "NOTE_ADDED",
+    description: "Unmarked as ghosted",
+    metadata: { reason: "unmark_ghosted" },
+  });
+
+  return serialize(updated);
+}

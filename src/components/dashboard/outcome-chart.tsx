@@ -4,6 +4,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -19,6 +20,17 @@ const tooltipStyle = {
   color: "var(--popover-foreground)",
   fontSize: 12,
 };
+
+const OUTCOME_COLORS: Record<string, string> = {
+  Active: "#0ea5e9",
+  Ghosted: "#d97706",
+  Screening: "#6366f1",
+  Interview: "#f59e0b",
+  Offer: "#10b981",
+  Rejected: "#ef4444",
+};
+
+const FALLBACK_COLOR = "var(--chart-1)";
 
 export function OutcomeChart({
   data,
@@ -42,11 +54,14 @@ export function OutcomeChart({
               tickLine={false}
             />
             <Tooltip contentStyle={tooltipStyle} />
-            <Bar
-              dataKey="value"
-              fill="var(--chart-1)"
-              radius={[2, 2, 0, 0]}
-            />
+            <Bar dataKey="value" radius={[2, 2, 0, 0]}>
+              {data.map((entry) => (
+                <Cell
+                  key={entry.name}
+                  fill={OUTCOME_COLORS[entry.name] ?? FALLBACK_COLOR}
+                />
+              ))}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </CardContent>

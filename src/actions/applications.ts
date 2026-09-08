@@ -10,6 +10,7 @@ import {
   deleteApplication as deleteApplicationQuery,
   getApplication,
   markStaleApplicationsGhosted,
+  unmarkApplicationGhosted as unmarkApplicationGhostedQuery,
   updateApplicationStatus as updateStatusQuery,
 } from "@/db/queries/applications";
 import {
@@ -23,6 +24,7 @@ import {
   addNoteSchema,
   applyEmailSchema,
   createApplicationSchema,
+  unmarkGhostedSchema,
   updateStatusSchema,
 } from "@/lib/validations/application";
 
@@ -279,6 +281,38 @@ export async function analyseGhostedApplicationsAction(): Promise<
     };
   } catch (error) {
     return fail(error, "Unable to analyse applications for ghosting.");
+  }
+}
+
+export async function unmarkGhostedApplicationAction(
+  input: unknown,
+): Promise<ActionResult<{ id: string }>> {
+  try {
+    const session = await getSession();
+    if (!session?.userId) {
+      return { ok: false, error: "You must be signed in." };
+    }
+
+    const { id } = unmarkGhostedSchema.parse(input);
+    const existing = await getApplication(id, session.userId);
+    if (!existing) {
+      return { ok: false, error: "Application not found." };
+    }
+    if (!existing.isGhosted) {
+      return { ok: true, data: { id } };
+    }
+
+    const updated = await unmarkApplicationGhostedQuery(id);
+    if (!updated) {
+      return { ok: false, error: "Unable to unmark this application." };
+    }
+
+    revalidatePath("/");
+    revalidatePath("/applications");
+    revalidatePath(`/applications/${id}`);
+    return { ok: true, data: { id } };
+  } catch (error) {
+    return fail(error, "Unable to unmark this application as ghosted.");
   }
 }
 
