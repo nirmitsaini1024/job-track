@@ -181,6 +181,12 @@ export const emailClassificationEnum = pgEnum("email_classification", [
   "OTHER",
 ]);
 
+export const recommendationStatusEnum = pgEnum("recommendation_status", [
+  "PENDING",
+  "DISMISSED",
+  "CONVERTED",
+]);
+
 export const applications = pgTable(
   "applications",
   {
@@ -315,6 +321,59 @@ export const applicationAttachments = pgTable(
   ],
 );
 
+export const jobRecommendations = pgTable(
+  "job_recommendations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    fromUserId: uuid("from_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    toUserId: uuid("to_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    sourceApplicationId: uuid("source_application_id").references(
+      () => applications.id,
+      { onDelete: "set null" },
+    ),
+    company: text("company").notNull(),
+    position: text("position").notNull(),
+    location: text("location"),
+    remoteType: remoteTypeEnum("remote_type").notNull().default("UNKNOWN"),
+    employmentType: text("employment_type"),
+    salaryMin: integer("salary_min"),
+    salaryMax: integer("salary_max"),
+    salaryCurrency: text("salary_currency"),
+    salaryPeriod: salaryPeriodEnum("salary_period"),
+    experienceMin: integer("experience_min"),
+    experienceMax: integer("experience_max"),
+    description: text("description").notNull().default(""),
+    applicationUrl: text("application_url").notNull(),
+    source: text("source"),
+    skills: jsonb("skills").$type<string[]>().notNull().default([]),
+    status: recommendationStatusEnum("status").notNull().default("PENDING"),
+    convertedApplicationId: uuid("converted_application_id").references(
+      () => applications.id,
+      { onDelete: "set null" },
+    ),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("job_recommendations_to_user_id_idx").on(table.toUserId),
+    index("job_recommendations_from_user_id_idx").on(table.fromUserId),
+    index("job_recommendations_status_idx").on(table.status),
+    index("job_recommendations_to_user_status_idx").on(
+      table.toUserId,
+      table.status,
+    ),
+    index("job_recommendations_application_url_idx").on(table.applicationUrl),
+  ],
+);
+
 export const usersRelations = relations(users, ({ one, many }) => ({
   profile: one(userProfiles, {
     fields: [users.id],
@@ -323,6 +382,12 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   applications: many(applications),
   questionnaireItems: many(userQuestionnaireItems),
   questionnaireDismissals: many(userQuestionnaireDismissals),
+  recommendationsSent: many(jobRecommendations, {
+    relationName: "recommendations_sent",
+  }),
+  recommendationsReceived: many(jobRecommendations, {
+    relationName: "recommendations_received",
+  }),
 }));
 
 export const userProfilesRelations = relations(userProfiles, ({ one }) => ({
@@ -415,6 +480,32 @@ export const communicationsRelations = relations(communications, ({ one }) => ({
   }),
 }));
 
+export const jobRecommendationsRelations = relations(
+  jobRecommendations,
+  ({ one }) => ({
+    fromUser: one(users, {
+      fields: [jobRecommendations.fromUserId],
+      references: [users.id],
+      relationName: "recommendations_sent",
+    }),
+    toUser: one(users, {
+      fields: [jobRecommendations.toUserId],
+      references: [users.id],
+      relationName: "recommendations_received",
+    }),
+    sourceApplication: one(applications, {
+      fields: [jobRecommendations.sourceApplicationId],
+      references: [applications.id],
+      relationName: "recommendation_source",
+    }),
+    convertedApplication: one(applications, {
+      fields: [jobRecommendations.convertedApplicationId],
+      references: [applications.id],
+      relationName: "recommendation_converted",
+    }),
+  }),
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type UserProfile = typeof userProfiles.$inferSelect;
@@ -427,6 +518,7 @@ export type ApplicationSkill = typeof applicationSkills.$inferSelect;
 export type ApplicationEvent = typeof applicationEvents.$inferSelect;
 export type Communication = typeof communications.$inferSelect;
 export type ApplicationAttachment = typeof applicationAttachments.$inferSelect;
+export type JobRecommendation = typeof jobRecommendations.$inferSelect;
 
 export type ApplicationStatus = (typeof applicationStatusEnum.enumValues)[number];
 export type RemoteType = (typeof remoteTypeEnum.enumValues)[number];
@@ -434,3 +526,5 @@ export type SalaryPeriod = (typeof salaryPeriodEnum.enumValues)[number];
 export type EventType = (typeof eventTypeEnum.enumValues)[number];
 export type EmailClassification =
   (typeof emailClassificationEnum.enumValues)[number];
+export type RecommendationStatus =
+  (typeof recommendationStatusEnum.enumValues)[number];
