@@ -3,6 +3,7 @@ import { StatusBadge } from "@/components/applications/status-badge";
 import { StatusSelector } from "@/components/applications/status-selector";
 import { DeleteApplicationButton } from "@/components/applications/delete-application-button";
 import { UnmarkGhostedButton } from "@/components/applications/unmark-ghosted-button";
+import { AppliedDateInput } from "@/components/applications/applied-date-input";
 import { ApplicationTimeline } from "@/components/applications/application-timeline";
 import { NoteForm } from "@/components/applications/note-form";
 import { ApplicationScreenshots } from "@/components/applications/application-screenshots";
@@ -35,12 +36,13 @@ export function ApplicationDetail({ application }: { application: Detail }) {
             </span>
             <span>·</span>
             <span>{application.location ?? "Location unknown"}</span>
-            <span>·</span>
-            <span>Applied {formatDate(application.appliedAt)}</span>
             {application.isGhosted ? (
-              <Badge variant="outline" className="text-amber-700 dark:text-amber-300">
-                Ghosted
-              </Badge>
+              <>
+                <span>·</span>
+                <Badge variant="outline" className="text-amber-700 dark:text-amber-300">
+                  Ghosted
+                </Badge>
+              </>
             ) : null}
           </div>
         </div>
@@ -88,6 +90,15 @@ export function ApplicationDetail({ application }: { application: Detail }) {
                 label="Source"
                 value={application.source ?? "—"}
               />
+              <div className="grid gap-1">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Applied date
+                </p>
+                <AppliedDateInput
+                  applicationId={application.id}
+                  appliedAt={application.appliedAt}
+                />
+              </div>
             </div>
             {application.applicationUrl ? (
               <div className="grid gap-1">

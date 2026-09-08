@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, exists, gte, ilike, inArray, lte, or, sql, type SQL } from "drizzle-orm";
+import { format } from "date-fns";
 import { getDb } from "@/db";
 import {
   applicationEvents,
@@ -410,6 +411,48 @@ export async function updateApplicationStatus(
     type: "STATUS_CHANGED",
     description: `Status changed from ${current.status} to ${status}`,
     metadata: { from: current.status, to: status },
+  });
+
+  return serialize(updated);
+}
+
+export async function updateApplicationAppliedAt(
+  id: string,
+  appliedAt: Date | null,
+) {
+  const db = getDb();
+  const [current] = await db
+    .select()
+    .from(applications)
+    .where(eq(applications.id, id))
+    .limit(1);
+
+  if (!current) return null;
+
+  const currentTime = current.appliedAt?.getTime() ?? null;
+  const nextTime = appliedAt?.getTime() ?? null;
+  if (currentTime === nextTime) return serialize(current);
+
+  const now = new Date();
+  const [updated] = await db
+    .update(applications)
+    .set({
+      appliedAt,
+      updatedAt: now,
+    })
+    .where(eq(applications.id, id))
+    .returning();
+
+  await db.insert(applicationEvents).values({
+    applicationId: id,
+    type: "NOTE_ADDED",
+    description: appliedAt
+      ? `Applied date set to ${format(appliedAt, "dd/MM/yyyy")}`
+      : "Applied date cleared",
+    metadata: {
+      reason: "update_applied_at",
+      appliedAt: appliedAt?.toISOString() ?? null,
+    },
   });
 
   return serialize(updated);

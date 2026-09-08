@@ -11,12 +11,14 @@ import {
   getApplication,
   markStaleApplicationsGhosted,
   unmarkApplicationGhosted as unmarkApplicationGhostedQuery,
+  updateApplicationAppliedAt as updateAppliedAtQuery,
   updateApplicationStatus as updateStatusQuery,
 } from "@/db/queries/applications";
 import {
   CLASSIFICATION_TO_EVENT,
   CLASSIFICATION_TO_STATUS,
 } from "@/lib/constants";
+import { parseAppliedDateInput } from "@/lib/format";
 import { GHOST_THRESHOLD_DAYS } from "@/lib/ghosted";
 import { getSession } from "@/lib/session";
 import { upsertQuestionsIntoBank } from "@/db/queries/questionnaire";
@@ -25,6 +27,7 @@ import {
   applyEmailSchema,
   createApplicationSchema,
   unmarkGhostedSchema,
+  updateAppliedAtSchema,
   updateStatusSchema,
 } from "@/lib/validations/application";
 
@@ -168,6 +171,44 @@ export async function updateApplicationStatusAction(
     return { ok: true, data: { id: updated.id } };
   } catch (error) {
     return fail(error, "Unable to update status.");
+  }
+}
+
+export async function updateApplicationAppliedAtAction(
+  input: unknown,
+): Promise<ActionResult<{ id: string }>> {
+  try {
+    const session = await getSession();
+    if (!session?.userId) {
+      return { ok: false, error: "You must be signed in." };
+    }
+
+    const data = updateAppliedAtSchema.parse(input);
+    const existing = await getApplication(data.id, session.userId);
+    if (!existing) {
+      return { ok: false, error: "Application not found." };
+    }
+
+    const appliedAt =
+      data.appliedAt === undefined
+        ? null
+        : parseAppliedDateInput(data.appliedAt);
+
+    if (data.appliedAt && !appliedAt) {
+      return { ok: false, error: "Enter a valid applied date." };
+    }
+
+    const updated = await updateAppliedAtQuery(data.id, appliedAt);
+    if (!updated) {
+      return { ok: false, error: "Application not found." };
+    }
+
+    revalidatePath("/");
+    revalidatePath("/applications");
+    revalidatePath(`/applications/${data.id}`);
+    return { ok: true, data: { id: updated.id } };
+  } catch (error) {
+    return fail(error, "Unable to update applied date.");
   }
 }
 

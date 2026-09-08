@@ -105,6 +105,17 @@ export const updateStatusSchema = z.object({
   status: applicationStatusSchema,
 });
 
+export const updateAppliedAtSchema = z.object({
+  id: z.string().uuid(),
+  appliedAt: z
+    .union([
+      z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid date"),
+      z.literal(""),
+      z.null(),
+    ])
+    .optional(),
+});
+
 export const unmarkGhostedSchema = z.object({
   id: z.string().uuid(),
 });

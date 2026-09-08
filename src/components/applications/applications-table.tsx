@@ -10,7 +10,8 @@ import {
 import { StatusBadge } from "@/components/applications/status-badge";
 import { DeleteApplicationButton } from "@/components/applications/delete-application-button";
 import { UnmarkGhostedButton } from "@/components/applications/unmark-ghosted-button";
-import { formatDate, formatRelative, formatSalary } from "@/lib/format";
+import { AppliedDateInput } from "@/components/applications/applied-date-input";
+import { formatRelative, formatSalary } from "@/lib/format";
 import type { SerializedApplication } from "@/db/queries/applications";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -66,7 +67,7 @@ export function ApplicationsTable({
             <TableHead className="w-[16%]">Location</TableHead>
             <TableHead className="w-[12%]">Salary</TableHead>
             <TableHead className="w-[7.5rem]">Status</TableHead>
-            <TableHead className="w-[10%]">Applied</TableHead>
+            <TableHead className="w-[8.5rem]">Applied</TableHead>
             <TableHead className="w-[11%]">Last activity</TableHead>
             <TableHead className="w-[8%]">Ghosted</TableHead>
             <TableHead className="w-10 text-right">
@@ -107,8 +108,12 @@ export function ApplicationsTable({
                   className="w-[6.5rem] justify-center"
                 />
               </TableCell>
-              <TableCell className="whitespace-normal align-top">
-                {formatDate(item.appliedAt)}
+              <TableCell className="align-top">
+                <AppliedDateInput
+                  applicationId={item.id}
+                  appliedAt={item.appliedAt}
+                  compact
+                />
               </TableCell>
               <TableCell className="whitespace-normal align-top text-muted-foreground">
                 {formatRelative(item.lastActivityAt)}
