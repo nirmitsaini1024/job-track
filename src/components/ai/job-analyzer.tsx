@@ -184,6 +184,24 @@ export function JobAnalyzer() {
     );
   }
 
+  async function onAnalyzeImagePaste(
+    event: React.ClipboardEvent<HTMLDivElement>,
+  ) {
+    const files = Array.from(event.clipboardData.items)
+      .filter((item) => item.type.startsWith("image/"))
+      .map((item) => item.getAsFile())
+      .filter((file): file is File => Boolean(file));
+
+    if (!files.length) return;
+    event.preventDefault();
+    addFiles(files, setAnalyzeImages);
+    toast.success(
+      files.length === 1
+        ? "Image added for AI analysis"
+        : `${files.length} images added for AI analysis`,
+    );
+  }
+
   async function analyze() {
     setAnalyzing(true);
     setError(null);
@@ -619,45 +637,67 @@ export function JobAnalyzer() {
           />
         </Field>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <Input
-            type="file"
-            accept={ALLOWED_IMAGE_TYPES.join(",")}
-            multiple
-            className="max-w-xs"
-            onChange={(e) => {
-              addFiles(Array.from(e.target.files ?? []), setAnalyzeImages);
-              e.target.value = "";
-            }}
-          />
-          <p className="text-sm text-muted-foreground">
-            AI analysis images · not stored
-          </p>
-        </div>
-
-        {analyzeImages.length > 0 ? (
-          <div className="grid gap-3 sm:grid-cols-2">
-            {analyzeImages.map((image) => (
-              <div key={image.id} className="relative overflow-hidden rounded-md border">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={image.preview}
-                  alt="AI analysis image"
-                  className="max-h-56 w-full object-contain bg-muted/30"
-                />
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  className="absolute top-2 right-2"
-                  onClick={() => removeImage(image.id, setAnalyzeImages)}
-                >
-                  Remove
-                </Button>
-              </div>
-            ))}
+        <div className="grid gap-3 rounded-md border p-4">
+          <div>
+            <p className="text-sm font-medium">AI analysis images</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Sent to AI only — not stored. Click the box and paste
+              (Ctrl/Cmd+V), or upload.
+            </p>
           </div>
-        ) : null}
+          <div
+            tabIndex={0}
+            onPaste={onAnalyzeImagePaste}
+            className="rounded-md border border-dashed p-4 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                type="file"
+                accept={ALLOWED_IMAGE_TYPES.join(",")}
+                multiple
+                className="max-w-xs"
+                onChange={(e) => {
+                  addFiles(Array.from(e.target.files ?? []), setAnalyzeImages);
+                  e.target.value = "";
+                }}
+              />
+              <p className="text-sm text-muted-foreground">
+                Click this area and paste · JPEG/PNG/WebP/GIF · max 5MB each
+              </p>
+            </div>
+
+            {analyzeImages.length > 0 ? (
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                {analyzeImages.map((image) => (
+                  <div
+                    key={image.id}
+                    className="relative overflow-hidden rounded-md border"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={image.preview}
+                      alt="AI analysis image"
+                      className="max-h-56 w-full object-contain bg-muted/30"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      className="absolute top-2 right-2"
+                      onClick={() => removeImage(image.id, setAnalyzeImages)}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-muted-foreground">
+                No AI images yet.
+              </p>
+            )}
+          </div>
+        </div>
       </div>
 
       <ImageStoreSection
