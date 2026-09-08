@@ -20,9 +20,18 @@ const STYLES: Record<ApplicationStatus, string> = {
     "border-border bg-muted text-muted-foreground",
 };
 
-export function StatusBadge({ status }: { status: ApplicationStatus }) {
+export function StatusBadge({
+  status,
+  className,
+}: {
+  status: ApplicationStatus;
+  className?: string;
+}) {
   return (
-    <Badge variant="outline" className={cn("rounded-md font-medium", STYLES[status])}>
+    <Badge
+      variant="outline"
+      className={cn("rounded-md font-medium", STYLES[status], className)}
+    >
       {STATUS_LABELS[status]}
     </Badge>
   );

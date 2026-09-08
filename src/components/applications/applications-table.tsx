@@ -65,7 +65,7 @@ export function ApplicationsTable({
             <TableHead className="w-[20%]">Position</TableHead>
             <TableHead className="w-[16%]">Location</TableHead>
             <TableHead className="w-[12%]">Salary</TableHead>
-            <TableHead className="w-[10%]">Status</TableHead>
+            <TableHead className="w-[7.5rem]">Status</TableHead>
             <TableHead className="w-[10%]">Applied</TableHead>
             <TableHead className="w-[11%]">Last activity</TableHead>
             <TableHead className="w-[8%]">Ghosted</TableHead>
@@ -102,7 +102,10 @@ export function ApplicationsTable({
                 })}
               </TableCell>
               <TableCell className="align-top">
-                <StatusBadge status={item.status} />
+                <StatusBadge
+                  status={item.status}
+                  className="w-[6.5rem] justify-center"
+                />
               </TableCell>
               <TableCell className="whitespace-normal align-top">
                 {formatDate(item.appliedAt)}
