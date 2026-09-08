@@ -4,6 +4,7 @@ import { DeleteApplicationButton } from "@/components/applications/delete-applic
 import { UnmarkGhostedButton } from "@/components/applications/unmark-ghosted-button";
 import { AppliedDateInput } from "@/components/applications/applied-date-input";
 import { EditableApplicationFields } from "@/components/applications/editable-application-fields";
+import { RecommendJobPanel } from "@/components/applications/recommend-job-panel";
 import { ApplicationTimeline } from "@/components/applications/application-timeline";
 import { NoteForm } from "@/components/applications/note-form";
 import { ApplicationScreenshots } from "@/components/applications/application-screenshots";
@@ -122,6 +123,11 @@ export function ApplicationDetail({ application }: { application: Detail }) {
                 {application.description || "No description saved."}
               </p>
             </div>
+            <Separator />
+            <RecommendJobPanel
+              applicationId={application.id}
+              applicationUrl={application.applicationUrl}
+            />
           </CardContent>
         </Card>
 

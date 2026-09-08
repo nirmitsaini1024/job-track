@@ -321,6 +321,17 @@ export async function createApplication(
     metadata: { status: created.status },
   });
 
+  if (created.ownerId && created.applicationUrl) {
+    const { clearPendingRecommendationsForUrl } = await import(
+      "@/db/queries/recommendations"
+    );
+    await clearPendingRecommendationsForUrl({
+      userId: created.ownerId,
+      applicationUrl: created.applicationUrl,
+      convertedApplicationId: created.id,
+    });
+  }
+
   return serialize(created, uniqueSkills);
 }
 

@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { asc, eq, ne } from "drizzle-orm";
 import { getDb, users } from "@/db";
 
 export async function findUserByUsername(username: string) {
@@ -15,6 +15,18 @@ export async function findUserById(id: string) {
   const db = getDb();
   const [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
   return user ?? null;
+}
+
+export async function listUsernamesExcept(userId: string) {
+  const db = getDb();
+  return db
+    .select({
+      id: users.id,
+      username: users.username,
+    })
+    .from(users)
+    .where(ne(users.id, userId))
+    .orderBy(asc(users.username));
 }
 
 export async function createUser(input: {

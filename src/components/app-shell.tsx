@@ -20,6 +20,7 @@ const NAV = [
   { href: "/", label: "Dashboard" },
   { href: "/applications", label: "Applications" },
   { href: "/questionnaire", label: "Questionnaire" },
+  { href: "/recommendations", label: "Recommendations" },
   { href: "/profile", label: "Profile" },
 ];
 
