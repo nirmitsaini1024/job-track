@@ -76,6 +76,7 @@ export function ApplicationDetail({ application }: { application: Detail }) {
               company={application.company}
               applicationUrl={application.applicationUrl}
               employmentType={application.employmentType}
+              description={application.description}
             />
             <Separator />
             <div className="grid grid-cols-2 gap-4">
@@ -115,13 +116,6 @@ export function ApplicationDetail({ application }: { application: Detail }) {
                     ))
                   : <span className="text-sm text-muted-foreground">None extracted</span>}
               </div>
-            </div>
-            <Separator />
-            <div>
-              <p className="text-xs font-medium text-muted-foreground">Description</p>
-              <p className="mt-2 whitespace-pre-wrap text-sm leading-6">
-                {application.description || "No description saved."}
-              </p>
             </div>
             <Separator />
             <RecommendJobPanel

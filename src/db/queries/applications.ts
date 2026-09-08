@@ -395,6 +395,7 @@ export async function updateApplicationDetails(
     company: string;
     applicationUrl: string | null;
     employmentType: string | null;
+    description: string;
   },
 ) {
   const db = getDb();
@@ -409,10 +410,12 @@ export async function updateApplicationDetails(
   const company = input.company.trim();
   const applicationUrl = input.applicationUrl?.trim() || null;
   const employmentType = input.employmentType?.trim() || null;
+  const description = input.description;
   if (
     current.company === company &&
     (current.applicationUrl ?? null) === applicationUrl &&
-    (current.employmentType ?? null) === employmentType
+    (current.employmentType ?? null) === employmentType &&
+    current.description === description
   ) {
     return serialize(current);
   }
@@ -424,6 +427,7 @@ export async function updateApplicationDetails(
       company,
       applicationUrl,
       employmentType,
+      description,
       updatedAt: now,
     })
     .where(eq(applications.id, id))
@@ -446,6 +450,9 @@ export async function updateApplicationDetails(
         ? `Employment type updated to ${employmentType}`
         : "Employment type cleared",
     );
+  }
+  if (current.description !== description) {
+    changes.push("Description updated");
   }
 
   if (changes.length) {

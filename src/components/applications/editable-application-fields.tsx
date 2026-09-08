@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { updateApplicationDetailsAction } from "@/actions/applications";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 export function EditableApplicationFields({
@@ -13,28 +14,33 @@ export function EditableApplicationFields({
   company,
   applicationUrl,
   employmentType,
+  description,
 }: {
   applicationId: string;
   company: string;
   applicationUrl: string | null;
   employmentType: string | null;
+  description: string;
 }) {
   const [editing, setEditing] = useState(false);
   const [companyValue, setCompanyValue] = useState(company);
   const [urlValue, setUrlValue] = useState(applicationUrl ?? "");
   const [employmentValue, setEmploymentValue] = useState(employmentType ?? "");
+  const [descriptionValue, setDescriptionValue] = useState(description);
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
     setCompanyValue(company);
     setUrlValue(applicationUrl ?? "");
     setEmploymentValue(employmentType ?? "");
-  }, [company, applicationUrl, employmentType]);
+    setDescriptionValue(description);
+  }, [company, applicationUrl, employmentType, description]);
 
   function cancel() {
     setCompanyValue(company);
     setUrlValue(applicationUrl ?? "");
     setEmploymentValue(employmentType ?? "");
+    setDescriptionValue(description);
     setEditing(false);
   }
 
@@ -50,7 +56,8 @@ export function EditableApplicationFields({
     if (
       nextCompany === company &&
       nextUrl === (applicationUrl ?? "") &&
-      nextEmployment === (employmentType ?? "")
+      nextEmployment === (employmentType ?? "") &&
+      descriptionValue === description
     ) {
       setEditing(false);
       return;
@@ -62,6 +69,7 @@ export function EditableApplicationFields({
         company: nextCompany,
         applicationUrl: nextUrl || null,
         employmentType: nextEmployment || null,
+        description: descriptionValue,
       });
       if (!result.ok) {
         toast.error(result.error);
@@ -83,7 +91,7 @@ export function EditableApplicationFields({
             size="icon-sm"
             className="size-6 shrink-0 text-muted-foreground"
             aria-label="Edit details"
-            title="Edit company, employment type, and link"
+            title="Edit company, employment type, link, and description"
             onClick={() => setEditing(true)}
           >
             <Pencil className="size-3.5" />
@@ -129,10 +137,6 @@ export function EditableApplicationFields({
             placeholder="Company name"
             onChange={(event) => setCompanyValue(event.currentTarget.value)}
             onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                save();
-              }
               if (event.key === "Escape") cancel();
             }}
           />
@@ -153,10 +157,6 @@ export function EditableApplicationFields({
             placeholder="Full-time, Internship…"
             onChange={(event) => setEmploymentValue(event.currentTarget.value)}
             onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                save();
-              }
               if (event.key === "Escape") cancel();
             }}
           />
@@ -178,10 +178,6 @@ export function EditableApplicationFields({
             placeholder="https://…"
             onChange={(event) => setUrlValue(event.currentTarget.value)}
             onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                save();
-              }
               if (event.key === "Escape") cancel();
             }}
           />
@@ -196,6 +192,27 @@ export function EditableApplicationFields({
           </a>
         ) : (
           <p className="text-sm text-muted-foreground">No link saved</p>
+        )}
+      </div>
+
+      <div className="grid gap-1">
+        <p className="text-xs font-medium text-muted-foreground">Description</p>
+        {editing ? (
+          <Textarea
+            value={descriptionValue}
+            disabled={pending}
+            rows={8}
+            maxLength={50000}
+            placeholder="Job description…"
+            onChange={(event) => setDescriptionValue(event.currentTarget.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") cancel();
+            }}
+          />
+        ) : (
+          <p className="whitespace-pre-wrap text-sm leading-6">
+            {description || "No description saved."}
+          </p>
         )}
       </div>
     </div>

@@ -238,6 +238,7 @@ export async function updateApplicationDetailsAction(
       company: data.company,
       applicationUrl: urlValue || null,
       employmentType: data.employmentType?.trim() || null,
+      description: data.description ?? existing.description,
     });
     if (!updated) {
       return { ok: false, error: "Unable to update this application." };

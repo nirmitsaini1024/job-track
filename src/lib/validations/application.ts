@@ -125,6 +125,7 @@ export const updateApplicationDetailsSchema = z.object({
   employmentType: z
     .union([z.string().trim().max(100), z.literal(""), z.null()])
     .optional(),
+  description: z.string().max(50000).optional(),
 });
 
 export const unmarkGhostedSchema = z.object({
