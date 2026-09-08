@@ -1,9 +1,9 @@
-import Link from "next/link";
 import { StatusBadge } from "@/components/applications/status-badge";
 import { StatusSelector } from "@/components/applications/status-selector";
 import { DeleteApplicationButton } from "@/components/applications/delete-application-button";
 import { UnmarkGhostedButton } from "@/components/applications/unmark-ghosted-button";
 import { AppliedDateInput } from "@/components/applications/applied-date-input";
+import { EditableApplicationFields } from "@/components/applications/editable-application-fields";
 import { ApplicationTimeline } from "@/components/applications/application-timeline";
 import { NoteForm } from "@/components/applications/note-form";
 import { ApplicationScreenshots } from "@/components/applications/application-screenshots";
@@ -70,6 +70,12 @@ export function ApplicationDetail({ application }: { application: Detail }) {
             <CardTitle>Job information</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4">
+            <EditableApplicationFields
+              applicationId={application.id}
+              company={application.company}
+              applicationUrl={application.applicationUrl}
+            />
+            <Separator />
             <div className="grid grid-cols-2 gap-4">
               <Meta
                 label="Employment"
@@ -100,18 +106,6 @@ export function ApplicationDetail({ application }: { application: Detail }) {
                 />
               </div>
             </div>
-            {application.applicationUrl ? (
-              <div className="grid gap-1">
-                <p className="text-xs font-medium text-muted-foreground">Application URL</p>
-                <Link
-                  href={application.applicationUrl}
-                  className="break-all text-sm underline"
-                  target="_blank"
-                >
-                  {application.applicationUrl}
-                </Link>
-              </div>
-            ) : null}
             <div>
               <p className="text-xs font-medium text-muted-foreground">Skills</p>
               <div className="mt-2 flex flex-wrap gap-1.5">

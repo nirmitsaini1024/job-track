@@ -1,0 +1,168 @@
+"use client";
+
+import { useEffect, useState, useTransition } from "react";
+import { Check, Pencil, X } from "lucide-react";
+import { toast } from "sonner";
+import { updateApplicationDetailsAction } from "@/actions/applications";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
+
+export function EditableApplicationFields({
+  applicationId,
+  company,
+  applicationUrl,
+}: {
+  applicationId: string;
+  company: string;
+  applicationUrl: string | null;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [companyValue, setCompanyValue] = useState(company);
+  const [urlValue, setUrlValue] = useState(applicationUrl ?? "");
+  const [pending, startTransition] = useTransition();
+
+  useEffect(() => {
+    setCompanyValue(company);
+    setUrlValue(applicationUrl ?? "");
+  }, [company, applicationUrl]);
+
+  function cancel() {
+    setCompanyValue(company);
+    setUrlValue(applicationUrl ?? "");
+    setEditing(false);
+  }
+
+  function save() {
+    const nextCompany = companyValue.trim();
+    if (!nextCompany) {
+      toast.error("Company is required.");
+      return;
+    }
+
+    const nextUrl = urlValue.trim();
+    if (nextCompany === company && nextUrl === (applicationUrl ?? "")) {
+      setEditing(false);
+      return;
+    }
+
+    startTransition(async () => {
+      const result = await updateApplicationDetailsAction({
+        id: applicationId,
+        company: nextCompany,
+        applicationUrl: nextUrl || null,
+      });
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success("Application details updated");
+      setEditing(false);
+    });
+  }
+
+  return (
+    <div className={cn("grid gap-4", pending && "opacity-70")}>
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-xs font-medium text-muted-foreground">Details</p>
+        {!editing ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="size-6 shrink-0 text-muted-foreground"
+            aria-label="Edit company and link"
+            title="Edit company and link"
+            onClick={() => setEditing(true)}
+          >
+            <Pencil className="size-3.5" />
+          </Button>
+        ) : (
+          <div className="flex items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="size-6"
+              disabled={pending}
+              aria-label="Save"
+              title="Save"
+              onClick={save}
+            >
+              <Check className="size-3.5" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="size-6"
+              disabled={pending}
+              aria-label="Cancel"
+              title="Cancel"
+              onClick={cancel}
+            >
+              <X className="size-3.5" />
+            </Button>
+          </div>
+        )}
+      </div>
+
+      <div className="grid gap-1">
+        <p className="text-xs font-medium text-muted-foreground">Company</p>
+        {editing ? (
+          <Input
+            value={companyValue}
+            disabled={pending}
+            autoFocus
+            maxLength={200}
+            placeholder="Company name"
+            onChange={(event) => setCompanyValue(event.currentTarget.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                save();
+              }
+              if (event.key === "Escape") cancel();
+            }}
+          />
+        ) : (
+          <p className="text-sm">{company}</p>
+        )}
+      </div>
+
+      <div className="grid gap-1">
+        <p className="text-xs font-medium text-muted-foreground">
+          Application URL
+        </p>
+        {editing ? (
+          <Input
+            type="url"
+            value={urlValue}
+            disabled={pending}
+            maxLength={2000}
+            placeholder="https://…"
+            onChange={(event) => setUrlValue(event.currentTarget.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                save();
+              }
+              if (event.key === "Escape") cancel();
+            }}
+          />
+        ) : applicationUrl ? (
+          <a
+            href={applicationUrl}
+            className="break-all text-sm underline"
+            target="_blank"
+            rel="noreferrer"
+          >
+            {applicationUrl}
+          </a>
+        ) : (
+          <p className="text-sm text-muted-foreground">No link saved</p>
+        )}
+      </div>
+    </div>
+  );
+}

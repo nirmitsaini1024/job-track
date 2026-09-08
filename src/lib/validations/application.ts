@@ -116,6 +116,14 @@ export const updateAppliedAtSchema = z.object({
     .optional(),
 });
 
+export const updateApplicationDetailsSchema = z.object({
+  id: z.string().uuid(),
+  company: z.string().trim().min(1, "Company is required").max(200),
+  applicationUrl: z
+    .union([z.string().trim().max(2000), z.literal(""), z.null()])
+    .optional(),
+});
+
 export const unmarkGhostedSchema = z.object({
   id: z.string().uuid(),
 });

@@ -12,6 +12,7 @@ import {
   markStaleApplicationsGhosted,
   unmarkApplicationGhosted as unmarkApplicationGhostedQuery,
   updateApplicationAppliedAt as updateAppliedAtQuery,
+  updateApplicationDetails as updateDetailsQuery,
   updateApplicationStatus as updateStatusQuery,
 } from "@/db/queries/applications";
 import {
@@ -27,6 +28,7 @@ import {
   applyEmailSchema,
   createApplicationSchema,
   unmarkGhostedSchema,
+  updateApplicationDetailsSchema,
   updateAppliedAtSchema,
   updateStatusSchema,
 } from "@/lib/validations/application";
@@ -209,6 +211,43 @@ export async function updateApplicationAppliedAtAction(
     return { ok: true, data: { id: updated.id } };
   } catch (error) {
     return fail(error, "Unable to update applied date.");
+  }
+}
+
+export async function updateApplicationDetailsAction(
+  input: unknown,
+): Promise<ActionResult<{ id: string }>> {
+  try {
+    const session = await getSession();
+    if (!session?.userId) {
+      return { ok: false, error: "You must be signed in." };
+    }
+
+    const data = updateApplicationDetailsSchema.parse(input);
+    const existing = await getApplication(data.id, session.userId);
+    if (!existing) {
+      return { ok: false, error: "Application not found." };
+    }
+
+    const urlValue = data.applicationUrl?.trim() ?? "";
+    if (urlValue && !z.string().url().safeParse(urlValue).success) {
+      return { ok: false, error: "Enter a valid job URL or leave it blank." };
+    }
+
+    const updated = await updateDetailsQuery(data.id, {
+      company: data.company,
+      applicationUrl: urlValue || null,
+    });
+    if (!updated) {
+      return { ok: false, error: "Unable to update this application." };
+    }
+
+    revalidatePath("/");
+    revalidatePath("/applications");
+    revalidatePath(`/applications/${data.id}`);
+    return { ok: true, data: { id: updated.id } };
+  } catch (error) {
+    return fail(error, "Unable to update application details.");
   }
 }
 

@@ -378,6 +378,67 @@ export async function updateApplication(
   return serialize(updated, skills ?? existing.skills);
 }
 
+export async function updateApplicationDetails(
+  id: string,
+  input: { company: string; applicationUrl: string | null },
+) {
+  const db = getDb();
+  const [current] = await db
+    .select()
+    .from(applications)
+    .where(eq(applications.id, id))
+    .limit(1);
+
+  if (!current) return null;
+
+  const company = input.company.trim();
+  const applicationUrl = input.applicationUrl?.trim() || null;
+  if (
+    current.company === company &&
+    (current.applicationUrl ?? null) === applicationUrl
+  ) {
+    return serialize(current);
+  }
+
+  const now = new Date();
+  const [updated] = await db
+    .update(applications)
+    .set({
+      company,
+      applicationUrl,
+      updatedAt: now,
+    })
+    .where(eq(applications.id, id))
+    .returning();
+
+  const changes: string[] = [];
+  if (current.company !== company) {
+    changes.push(`Company updated to ${company}`);
+  }
+  if ((current.applicationUrl ?? null) !== applicationUrl) {
+    changes.push(
+      applicationUrl
+        ? `Application link updated to ${applicationUrl}`
+        : "Application link cleared",
+    );
+  }
+
+  if (changes.length) {
+    await db.insert(applicationEvents).values({
+      applicationId: id,
+      type: "NOTE_ADDED",
+      description: changes.join(". "),
+      metadata: {
+        reason: "update_details",
+        company,
+        applicationUrl,
+      },
+    });
+  }
+
+  return serialize(updated);
+}
+
 export async function updateApplicationStatus(
   id: string,
   status: ApplicationStatus,
