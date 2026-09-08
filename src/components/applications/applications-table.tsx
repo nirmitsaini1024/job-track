@@ -56,20 +56,19 @@ export function ApplicationsTable({
   }
 
   return (
-    <div className="rounded-xl border bg-card">
-      <Table>
+    <div className="min-w-0 overflow-hidden rounded-xl border bg-card">
+      <Table className="table-fixed">
         <TableHeader>
           <TableRow>
-            <TableHead>Company</TableHead>
-            <TableHead>Position</TableHead>
-            <TableHead>Location</TableHead>
-            <TableHead>Salary</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Applied</TableHead>
-            <TableHead>Last activity</TableHead>
-            <TableHead>Ghosted</TableHead>
-            <TableHead>Source</TableHead>
-            <TableHead className="w-12 text-right">
+            <TableHead className="w-[11%]">Company</TableHead>
+            <TableHead className="w-[20%]">Position</TableHead>
+            <TableHead className="w-[16%]">Location</TableHead>
+            <TableHead className="w-[12%]">Salary</TableHead>
+            <TableHead className="w-[10%]">Status</TableHead>
+            <TableHead className="w-[10%]">Applied</TableHead>
+            <TableHead className="w-[11%]">Last activity</TableHead>
+            <TableHead className="w-[8%]">Ghosted</TableHead>
+            <TableHead className="w-10 text-right">
               <span className="sr-only">Actions</span>
             </TableHead>
           </TableRow>
@@ -77,7 +76,7 @@ export function ApplicationsTable({
         <TableBody>
           {items.map((item) => (
             <TableRow key={item.id}>
-              <TableCell>
+              <TableCell className="whitespace-normal align-top">
                 <Link
                   href={`/applications/${item.id}`}
                   className="font-medium hover:underline"
@@ -85,13 +84,15 @@ export function ApplicationsTable({
                   {item.company}
                 </Link>
               </TableCell>
-              <TableCell>
-                <Link href={`/applications/${item.id}`}>{item.position}</Link>
+              <TableCell className="whitespace-normal align-top">
+                <Link href={`/applications/${item.id}`} className="leading-5">
+                  {item.position}
+                </Link>
               </TableCell>
-              <TableCell className="text-muted-foreground">
+              <TableCell className="whitespace-normal align-top text-muted-foreground leading-5">
                 {item.location ?? "—"}
               </TableCell>
-              <TableCell>
+              <TableCell className="whitespace-normal align-top">
                 {formatSalary({
                   min: item.salaryMin,
                   max: item.salaryMax,
@@ -99,14 +100,16 @@ export function ApplicationsTable({
                   period: item.salaryPeriod,
                 })}
               </TableCell>
-              <TableCell>
+              <TableCell className="align-top">
                 <StatusBadge status={item.status} />
               </TableCell>
-              <TableCell>{formatDate(item.appliedAt)}</TableCell>
-              <TableCell className="text-muted-foreground">
+              <TableCell className="whitespace-normal align-top">
+                {formatDate(item.appliedAt)}
+              </TableCell>
+              <TableCell className="whitespace-normal align-top text-muted-foreground">
                 {formatRelative(item.lastActivityAt)}
               </TableCell>
-              <TableCell>
+              <TableCell className="align-top">
                 {item.isGhosted ? (
                   <Badge
                     variant="outline"
@@ -118,10 +121,7 @@ export function ApplicationsTable({
                   <span className="text-muted-foreground">—</span>
                 )}
               </TableCell>
-              <TableCell className="text-muted-foreground">
-                {item.source ?? "—"}
-              </TableCell>
-              <TableCell className="text-right">
+              <TableCell className="align-top text-right">
                 <DeleteApplicationButton
                   applicationId={item.id}
                   company={item.company}

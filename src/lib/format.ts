@@ -93,3 +93,29 @@ export function formatPercent(value: number): string {
   if (!Number.isFinite(value)) return "0%";
   return `${Math.round(value * 100)}%`;
 }
+
+/** Digits only → Indian grouping, e.g. 100000 → "1,00,000" */
+export function formatIndianNumber(value: string | number | null | undefined): string {
+  if (value == null || value === "") return "";
+  const digits =
+    typeof value === "number"
+      ? String(Math.trunc(Math.abs(value)))
+      : value.replace(/[^\d]/g, "");
+  if (!digits) return "";
+  return Number(digits).toLocaleString("en-IN");
+}
+
+/** "1,00,000" → 100000 (or null if empty/invalid) */
+export function parseIndianNumber(
+  value: string | number | null | undefined,
+): number | null {
+  if (value == null || value === "") return null;
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.round(value);
+  }
+  const digits = String(value).replace(/[^\d]/g, "");
+  if (!digits) return null;
+  const parsed = Number(digits);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+

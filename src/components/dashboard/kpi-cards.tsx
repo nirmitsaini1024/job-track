@@ -6,6 +6,7 @@ export function KpiCards({ stats }: { stats: DashboardStats }) {
   const items = [
     { label: "Total applications", value: String(stats.total) },
     { label: "Active", value: String(stats.active) },
+    { label: "Screening", value: String(stats.screenings) },
     { label: "Rejected", value: String(stats.rejected) },
     { label: "Ghosted", value: String(stats.ghosted) },
     { label: "Interviews", value: String(stats.interviews) },
@@ -16,9 +17,9 @@ export function KpiCards({ stats }: { stats: DashboardStats }) {
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-9">
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-5 xl:grid-cols-5">
       {items.map((item) => (
-        <Card key={item.label} size="sm" className="rounded-lg">
+        <Card key={item.label} size="sm">
           <CardHeader className="pb-0">
             <CardTitle className="text-xs font-medium text-muted-foreground">
               {item.label}

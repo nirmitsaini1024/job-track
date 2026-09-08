@@ -68,6 +68,7 @@ export type DashboardStats = {
   active: number;
   rejected: number;
   ghosted: number;
+  screenings: number;
   interviews: number;
   offers: number;
   responseRate: number;
@@ -86,23 +87,19 @@ export type ApplicationAnalytics = DashboardStats & {
     responseRate: number;
     interviews: number;
   }[];
-  bySource: {
-    source: string;
-    applied: number;
-    responses: number;
-    responseRate: number;
-  }[];
 };
 
 export async function getDashboardStats(
   filters: ApplicationFilters = {},
+  ownerId?: string,
 ): Promise<DashboardStats> {
-  const analytics = await getApplicationAnalytics(filters);
+  const analytics = await getApplicationAnalytics(filters, ownerId);
   return {
     total: analytics.total,
     active: analytics.active,
     rejected: analytics.rejected,
     ghosted: analytics.ghosted,
+    screenings: analytics.screenings,
     interviews: analytics.interviews,
     offers: analytics.offers,
     responseRate: analytics.responseRate,
@@ -113,9 +110,10 @@ export async function getDashboardStats(
 
 export async function getApplicationAnalytics(
   filters: ApplicationFilters = {},
+  ownerId?: string,
 ): Promise<ApplicationAnalytics> {
   const { applications, events, communications } =
-    await getApplicationsForAnalytics(filters);
+    await getApplicationsForAnalytics(filters, ownerId);
 
   const eventsByApp = groupBy(events, (e) => e.applicationId);
   const commsByApp = groupBy(communications, (c) => c.applicationId);
@@ -124,6 +122,9 @@ export async function getApplicationAnalytics(
   const active = applications.filter((app) => isActiveStatus(app.status)).length;
   const rejected = applications.filter((app) => app.status === "REJECTED").length;
   const ghosted = applications.filter((app) => isGhosted(app)).length;
+  const screeningCurrent = applications.filter(
+    (app) => app.status === "SCREENING",
+  ).length;
 
   let responses = 0;
   let screenings = 0;
@@ -135,7 +136,6 @@ export async function getApplicationAnalytics(
     string,
     { applied: number; responses: number; interviews: number }
   >();
-  const sourceMap = new Map<string, { applied: number; responses: number }>();
 
   let interviewCurrent = 0;
   let offerCurrent = 0;
@@ -173,12 +173,6 @@ export async function getApplicationAnalytics(
     if (responded) pos.responses += 1;
     if (reachedInterview) pos.interviews += 1;
     positionMap.set(position, pos);
-
-    const source = app.source?.trim() || "Other";
-    const src = sourceMap.get(source) ?? { applied: 0, responses: 0 };
-    src.applied += 1;
-    if (responded) src.responses += 1;
-    sourceMap.set(source, src);
   }
 
   const volume = [...volumeMap.entries()]
@@ -195,20 +189,12 @@ export async function getApplicationAnalytics(
     }))
     .sort((a, b) => b.applied - a.applied);
 
-  const bySource = [...sourceMap.entries()]
-    .map(([source, stats]) => ({
-      source,
-      applied: stats.applied,
-      responses: stats.responses,
-      responseRate: stats.applied ? stats.responses / stats.applied : 0,
-    }))
-    .sort((a, b) => b.applied - a.applied);
-
   return {
     total,
     active,
     rejected,
     ghosted,
+    screenings: screeningCurrent,
     interviews: interviewCurrent,
     offers: offerCurrent,
     responseRate: total ? responses / total : 0,
@@ -225,12 +211,12 @@ export async function getApplicationAnalytics(
     outcomes: [
       { name: "Active", value: active },
       { name: "Ghosted", value: ghosted },
+      { name: "Screening", value: screeningCurrent },
       { name: "Interview", value: interviewCurrent },
       { name: "Offer", value: offerCurrent },
       { name: "Rejected", value: rejected },
     ],
     byPosition,
-    bySource,
   };
 }
 

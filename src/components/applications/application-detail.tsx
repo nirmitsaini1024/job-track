@@ -63,25 +63,27 @@ export function ApplicationDetail({ application }: { application: Detail }) {
             <CardTitle>Job information</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4">
-            <Meta
-              label="Employment"
-              value={application.employmentType ?? "—"}
-            />
-            <Meta
-              label="Remote"
-              value={REMOTE_LABELS[application.remoteType as RemoteType]}
-            />
-            <Meta
-              label="Experience"
-              value={formatExperience(
-                application.experienceMin,
-                application.experienceMax,
-              )}
-            />
-            <Meta
-              label="Source"
-              value={application.source ?? "—"}
-            />
+            <div className="grid grid-cols-2 gap-4">
+              <Meta
+                label="Employment"
+                value={application.employmentType ?? "—"}
+              />
+              <Meta
+                label="Remote"
+                value={REMOTE_LABELS[application.remoteType as RemoteType]}
+              />
+              <Meta
+                label="Experience"
+                value={formatExperience(
+                  application.experienceMin,
+                  application.experienceMax,
+                )}
+              />
+              <Meta
+                label="Source"
+                value={application.source ?? "—"}
+              />
+            </div>
             {application.applicationUrl ? (
               <div className="grid gap-1">
                 <p className="text-xs font-medium text-muted-foreground">Application URL</p>
@@ -125,6 +127,28 @@ export function ApplicationDetail({ application }: { application: Detail }) {
           </CardContent>
         </Card>
       </div>
+
+      {application.questionAnswers.length > 0 ? (
+        <Card className="rounded-lg">
+          <CardHeader>
+            <CardTitle>Questions & answers</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4">
+            {application.questionAnswers.map((item, index) => (
+              <div key={`${index}-${item.question.slice(0, 24)}`} className="rounded-lg border p-4">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Question {index + 1}
+                </p>
+                <p className="mt-1 whitespace-pre-wrap text-sm font-medium leading-6">
+                  {item.question}
+                </p>
+                <p className="mt-3 text-xs font-medium text-muted-foreground">Answer</p>
+                <p className="mt-1 whitespace-pre-wrap text-sm leading-6">{item.answer}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card className="rounded-lg">
         <CardHeader>

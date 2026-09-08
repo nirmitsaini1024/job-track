@@ -5,18 +5,20 @@ import { ApplicationFunnel } from "@/components/dashboard/application-funnel";
 import { OutcomeChart } from "@/components/dashboard/outcome-chart";
 import { PositionPerformance } from "@/components/dashboard/position-performance";
 import { getApplicationAnalytics } from "@/db/queries/dashboard";
+import { requireSession } from "@/lib/auth";
 import { parseSearchParams } from "@/lib/validations/application";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage({ searchParams }: PageProps<"/">) {
+  const session = await requireSession();
   const filters = parseSearchParams(await searchParams);
 
   let analytics: Awaited<ReturnType<typeof getApplicationAnalytics>> | null = null;
   let error: string | null = null;
 
   try {
-    analytics = await getApplicationAnalytics(filters);
+    analytics = await getApplicationAnalytics(filters, session.userId);
   } catch (err) {
     error =
       err instanceof Error && err.message.includes("DATABASE_URL")
@@ -39,10 +41,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/">) {
             <ApplicationFunnel data={analytics.funnel} />
           </div>
           <OutcomeChart data={analytics.outcomes} />
-          <PositionPerformance
-            byPosition={analytics.byPosition}
-            bySource={analytics.bySource}
-          />
+          <PositionPerformance byPosition={analytics.byPosition} />
         </>
       )}
     </div>

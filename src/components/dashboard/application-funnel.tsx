@@ -8,7 +8,7 @@ export function ApplicationFunnel({
   const max = Math.max(...data.map((item) => item.count), 1);
 
   return (
-    <Card className="rounded-lg">
+    <Card>
       <CardHeader>
         <CardTitle>Funnel</CardTitle>
       </CardHeader>
@@ -19,9 +19,9 @@ export function ApplicationFunnel({
               <span>{item.stage}</span>
               <span className="text-muted-foreground">{item.count}</span>
             </div>
-            <div className="h-2 overflow-hidden rounded-full bg-muted">
+            <div className="h-2 overflow-hidden rounded-md bg-muted">
               <div
-                className="h-full rounded-full bg-foreground/80"
+                className="h-full rounded-md bg-chart-1"
                 style={{ width: `${(item.count / max) * 100}%` }}
               />
             </div>

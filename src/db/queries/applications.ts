@@ -8,7 +8,7 @@ import {
   type ApplicationStatus,
   type NewApplication,
 } from "@/db/schema";
-import { isGhosted } from "@/lib/ghosted";
+import { isEligibleForGhost, isGhosted, GHOST_THRESHOLD_DAYS } from "@/lib/ghosted";
 import type { ApplicationFilters } from "@/lib/validations/application";
 
 export type SerializedApplication = {
@@ -27,6 +27,7 @@ export type SerializedApplication = {
   description: string;
   applicationUrl: string | null;
   source: string | null;
+  questionAnswers: Array<{ question: string; answer: string }>;
   status: ApplicationStatus;
   appliedAt: string | null;
   lastActivityAt: string;
@@ -56,6 +57,7 @@ function serialize(
     description: row.description,
     applicationUrl: row.applicationUrl,
     source: row.source,
+    questionAnswers: row.questionAnswers ?? [],
     status: row.status,
     appliedAt: row.appliedAt?.toISOString() ?? null,
     lastActivityAt: row.lastActivityAt.toISOString(),
@@ -72,8 +74,15 @@ function dateFrom(value?: string) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-export function buildApplicationConditions(filters: ApplicationFilters = {}): SQL[] {
+export function buildApplicationConditions(
+  filters: ApplicationFilters = {},
+  ownerId?: string,
+): SQL[] {
   const conditions: SQL[] = [];
+
+  if (ownerId) {
+    conditions.push(eq(applications.ownerId, ownerId));
+  }
 
   if (filters.position) {
     conditions.push(ilike(applications.position, `%${filters.position}%`));
@@ -152,11 +161,14 @@ export function buildApplicationConditions(filters: ApplicationFilters = {}): SQ
   return conditions;
 }
 
-export async function getApplications(filters: ApplicationFilters = {}) {
+export async function getApplications(
+  filters: ApplicationFilters = {},
+  ownerId?: string,
+) {
   const db = getDb();
   const page = filters.page ?? 1;
   const pageSize = filters.pageSize ?? 25;
-  const conditions = buildApplicationConditions(filters);
+  const conditions = buildApplicationConditions(filters, ownerId);
   const where = conditions.length ? and(...conditions) : undefined;
 
   const sortColumn =
@@ -215,12 +227,17 @@ export async function getApplications(filters: ApplicationFilters = {}) {
   };
 }
 
-export async function getApplication(id: string) {
+export async function getApplication(id: string, ownerId?: string) {
   const db = getDb();
+  const conditions = [eq(applications.id, id)];
+  if (ownerId) {
+    conditions.push(eq(applications.ownerId, ownerId));
+  }
+
   const [row] = await db
     .select()
     .from(applications)
-    .where(eq(applications.id, id))
+    .where(and(...conditions))
     .limit(1);
 
   if (!row) return null;
@@ -373,6 +390,7 @@ export async function updateApplicationStatus(
       status,
       updatedAt: now,
       lastActivityAt: now,
+      ghosted: false,
       appliedAt:
         status === "APPLIED" && !current.appliedAt ? now : current.appliedAt,
     })
@@ -411,7 +429,7 @@ export async function createEvent(input: {
     const now = new Date();
     await db
       .update(applications)
-      .set({ lastActivityAt: now, updatedAt: now })
+      .set({ lastActivityAt: now, updatedAt: now, ghosted: false })
       .where(eq(applications.id, input.applicationId));
   }
 
@@ -447,7 +465,7 @@ export async function createCommunication(input: {
   const now = new Date();
   await db
     .update(applications)
-    .set({ lastActivityAt: now, updatedAt: now })
+    .set({ lastActivityAt: now, updatedAt: now, ghosted: false })
     .where(eq(applications.id, input.applicationId));
 
   return row;
@@ -461,9 +479,12 @@ export async function addNote(applicationId: string, note: string) {
   });
 }
 
-export async function getApplicationsForAnalytics(filters: ApplicationFilters = {}) {
+export async function getApplicationsForAnalytics(
+  filters: ApplicationFilters = {},
+  ownerId?: string,
+) {
   const db = getDb();
-  const conditions = buildApplicationConditions(filters);
+  const conditions = buildApplicationConditions(filters, ownerId);
   const where = conditions.length ? and(...conditions) : undefined;
 
   const rows = await db.select().from(applications).where(where);
@@ -492,4 +513,39 @@ export async function getApplicationsForAnalytics(filters: ApplicationFilters = 
           .where(inArray(communications.applicationId, ids));
 
   return { applications: ghostFiltered, events, communications: comms };
+}
+
+export async function markStaleApplicationsGhosted(ownerId: string) {
+  const db = getDb();
+  const rows = await db
+    .select()
+    .from(applications)
+    .where(eq(applications.ownerId, ownerId));
+
+  const eligible = rows.filter((row) => isEligibleForGhost(row));
+  if (!eligible.length) {
+    return { marked: 0, ids: [] as string[] };
+  }
+
+  const now = new Date();
+  const ids = eligible.map((row) => row.id);
+
+  await db
+    .update(applications)
+    .set({ ghosted: true, updatedAt: now })
+    .where(inArray(applications.id, ids));
+
+  for (const row of eligible) {
+    await db.insert(applicationEvents).values({
+      applicationId: row.id,
+      type: "NOTE_ADDED",
+      description: `Marked as ghosted after ${GHOST_THRESHOLD_DAYS} days with no activity`,
+      metadata: {
+        reason: "analyse_ghosted",
+        thresholdDays: GHOST_THRESHOLD_DAYS,
+      },
+    });
+  }
+
+  return { marked: ids.length, ids };
 }

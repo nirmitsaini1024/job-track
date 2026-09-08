@@ -11,13 +11,22 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
+const tick = { fontSize: 11, fill: "var(--muted-foreground)" };
+const tooltipStyle = {
+  backgroundColor: "var(--popover)",
+  border: "1px solid var(--border)",
+  borderRadius: "var(--radius)",
+  color: "var(--popover-foreground)",
+  fontSize: 12,
+};
+
 export function ApplicationChart({
   data,
 }: {
   data: { date: string; count: number }[];
 }) {
   return (
-    <Card className="rounded-lg">
+    <Card>
       <CardHeader>
         <CardTitle>Application volume</CardTitle>
       </CardHeader>
@@ -27,15 +36,22 @@ export function ApplicationChart({
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-              <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-              <Tooltip />
+              <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
+              <XAxis dataKey="date" tick={tick} axisLine={false} tickLine={false} />
+              <YAxis
+                allowDecimals={false}
+                tick={tick}
+                axisLine={false}
+                tickLine={false}
+              />
+              <Tooltip contentStyle={tooltipStyle} />
               <Area
                 type="monotone"
                 dataKey="count"
-                stroke="var(--foreground)"
-                fill="var(--muted)"
+                stroke="var(--chart-1)"
+                fill="var(--chart-1)"
+                fillOpacity={0.18}
+                strokeWidth={2}
               />
             </AreaChart>
           </ResponsiveContainer>

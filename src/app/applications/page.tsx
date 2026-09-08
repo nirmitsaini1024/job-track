@@ -1,6 +1,7 @@
 import { ApplicationsTable } from "@/components/applications/applications-table";
 import { ApplicationFilters } from "@/components/applications/application-filters";
 import { getApplications } from "@/db/queries/applications";
+import { requireSession } from "@/lib/auth";
 import { parseSearchParams } from "@/lib/validations/application";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +11,7 @@ export default async function ApplicationsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const session = await requireSession();
   const raw = await searchParams;
   const filters = parseSearchParams(raw);
   const query = new URLSearchParams(
@@ -21,7 +23,7 @@ export default async function ApplicationsPage({
   let result: Awaited<ReturnType<typeof getApplications>> | null = null;
   let error: string | null = null;
   try {
-    result = await getApplications(filters);
+    result = await getApplications(filters, session.userId);
   } catch (err) {
     error =
       err instanceof Error && err.message.includes("DATABASE_URL")
@@ -38,7 +40,7 @@ export default async function ApplicationsPage({
   }
 
   return (
-    <div className="grid gap-6">
+    <div className="grid min-w-0 gap-6">
       <div>
         <h1 className="text-xl font-medium tracking-tight">Applications</h1>
         <p className="mt-1 text-sm text-muted-foreground">

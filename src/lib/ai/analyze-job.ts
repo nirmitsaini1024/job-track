@@ -1,5 +1,8 @@
 import { AiError, completeJson } from "./client";
+import { analyzeQuestionnaire } from "./analyze-questionnaire";
+import { extractApplicationQuestions } from "./extract-questions";
 import { JOB_SYSTEM_PROMPT, JOB_USER_PROMPT } from "./prompts";
+import { enrichQuestionAnswers } from "./resume-context";
 import {
   jobExtractionJsonSchema,
   jobExtractionSchema,
@@ -8,35 +11,57 @@ import {
 
 export type AnalyzeJobInput = {
   text?: string;
+  images?: Array<{
+    mimeType: string;
+    base64: string;
+  }>;
+  /** @deprecated prefer images[] */
   image?: {
     mimeType: string;
     base64: string;
   };
   source?: string | null;
   applicationUrl?: string | null;
+  resumeData?: string | null;
 };
 
 export async function analyzeJob(input: AnalyzeJobInput): Promise<JobExtraction> {
   const text = input.text?.trim() ?? "";
-  if (!text && !input.image) {
-    throw new AiError("Paste a job description or upload a screenshot.", "empty");
+  const images = [
+    ...(input.images ?? []),
+    ...(input.image ? [input.image] : []),
+  ];
+  const resumeData = input.resumeData?.trim() ?? "";
+
+  if (!text && images.length === 0) {
+    throw new AiError(
+      "Paste a job description, questions, and/or images to analyze.",
+      "empty",
+    );
   }
 
+  const resumeBlock = resumeData
+    ? `\n\nCandidate resume profile (use ONLY to answer questions; never invent questions from this):\n${resumeData}`
+    : `\n\nCandidate resume profile:\n(No resume profile was provided. If questions exist in the JD, note that resume data is missing.)`;
+
+  const promptText = `${JOB_USER_PROMPT}
+
+Job posting input (source of truth for which questions exist):
+${text || "(Job description / questions are in the attached image(s).)"}
+${resumeBlock}`;
+
   const userContent: Parameters<typeof completeJson>[0]["messages"][number]["content"] =
-    input.image
+    images.length > 0
       ? [
-          {
-            type: "text",
-            text: `${JOB_USER_PROMPT}\n\n${text || "(Job description is in the attached image.)"}`,
-          },
-          {
-            type: "image_url",
+          { type: "text", text: promptText },
+          ...images.map((image) => ({
+            type: "image_url" as const,
             image_url: {
-              url: `data:${input.image.mimeType};base64,${input.image.base64}`,
+              url: `data:${image.mimeType};base64,${image.base64}`,
             },
-          },
+          })),
         ]
-      : `${JOB_USER_PROMPT}\n\n${text}`;
+      : promptText;
 
   const raw = await completeJson({
     schemaName: "job_extraction",
@@ -70,6 +95,33 @@ export async function analyzeJob(input: AnalyzeJobInput): Promise<JobExtraction>
   ) {
     result.experience = null;
   }
+
+  let cleanedQuestions = (result.questions ?? [])
+    .map((item) => ({
+      question: item.question.trim(),
+      answer: item.answer.trim(),
+    }))
+    .filter((item) => item.question.length > 0);
+
+  // Fallback: dedicated pass to find form questions (especially from screenshots).
+  if (cleanedQuestions.length === 0) {
+    const extracted = await extractApplicationQuestions({ text, images });
+    if (extracted.length && resumeData) {
+      cleanedQuestions = await analyzeQuestionnaire({
+        questions: extracted,
+        resumeData,
+      });
+    } else if (extracted.length) {
+      cleanedQuestions = extracted.map((question) => ({
+        question,
+        answer: "Resume data missing — add profile resume to draft answers.",
+      }));
+    }
+  }
+
+  result.questions = resumeData
+    ? enrichQuestionAnswers(cleanedQuestions, resumeData)
+    : cleanedQuestions;
 
   return result;
 }

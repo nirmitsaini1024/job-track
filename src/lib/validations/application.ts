@@ -83,6 +83,15 @@ export const createApplicationSchema = z.object({
   status: applicationStatusSchema.default("SAVED"),
   appliedAt: z.string().datetime().nullable().optional(),
   skills: z.array(z.string().trim().min(1).max(80)).max(50).default([]),
+  questionAnswers: z
+    .array(
+      z.object({
+        question: z.string().trim().min(1).max(2000),
+        answer: z.string().trim().min(1).max(20000),
+      }),
+    )
+    .max(50)
+    .default([]),
 });
 
 export type CreateApplicationInput = z.infer<typeof createApplicationSchema>;

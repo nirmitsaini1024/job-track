@@ -27,6 +27,14 @@ export const jobExtractionSchema = z.object({
   description: z.string(),
   source: z.string().nullable(),
   applicationUrl: z.string().nullable(),
+  questions: z
+    .array(
+      z.object({
+        question: z.string(),
+        answer: z.string(),
+      }),
+    )
+    .default([]),
 });
 
 export type JobExtraction = z.infer<typeof jobExtractionSchema>;
@@ -106,6 +114,18 @@ export const jobExtractionJsonSchema = {
     description: { type: "string" },
     source: nullableString,
     applicationUrl: nullableString,
+    questions: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          question: { type: "string" },
+          answer: { type: "string" },
+        },
+        required: ["question", "answer"],
+      },
+    },
   },
   required: [
     "company",
@@ -119,6 +139,7 @@ export const jobExtractionJsonSchema = {
     "description",
     "source",
     "applicationUrl",
+    "questions",
   ],
 } as const;
 

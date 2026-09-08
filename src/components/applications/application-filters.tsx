@@ -44,7 +44,7 @@ export function ApplicationFilters({ showSearch = true }: { showSearch?: boolean
   }
 
   return (
-    <div className="grid gap-3 rounded-xl border bg-card p-4">
+    <div className="grid min-w-0 gap-3 overflow-hidden rounded-xl border bg-card p-4">
       {showSearch ? (
         <Input
           placeholder="Search company, position, location, skills"

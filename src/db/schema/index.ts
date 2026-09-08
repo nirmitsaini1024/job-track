@@ -1,4 +1,5 @@
 import {
+  boolean,
   index,
   integer,
   jsonb,
@@ -10,6 +11,103 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
+
+export const users = pgTable(
+  "users",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    username: text("username").notNull(),
+    passwordHash: text("password_hash").notNull(),
+    onboardingCompleted: boolean("onboarding_completed").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("users_username_idx").on(table.username),
+    index("users_created_at_idx").on(table.createdAt),
+  ],
+);
+
+export const userProfiles = pgTable(
+  "user_profiles",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    resumeData: text("resume_data"),
+    bestProjects: text("best_projects"),
+    proudProject: text("proud_project"),
+    projectLinks: text("project_links"),
+    hardestProject: text("hardest_project"),
+    programmingInspiration: text("programming_inspiration"),
+    rejectionPitch: text("rejection_pitch"),
+    questionnaireContext: jsonb("questionnaire_context")
+      .$type<Array<{ question: string; answer: string }>>()
+      .notNull()
+      .default([]),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("user_profiles_user_id_idx").on(table.userId),
+    index("user_profiles_created_at_idx").on(table.createdAt),
+  ],
+);
+
+export const questionnaireQuestions = pgTable(
+  "questionnaire_questions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    question: text("question").notNull(),
+    normalizedKey: text("normalized_key").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("questionnaire_questions_normalized_key_idx").on(
+      table.normalizedKey,
+    ),
+    index("questionnaire_questions_created_at_idx").on(table.createdAt),
+  ],
+);
+
+export const userQuestionnaireItems = pgTable(
+  "user_questionnaire_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    questionId: uuid("question_id")
+      .notNull()
+      .references(() => questionnaireQuestions.id, { onDelete: "cascade" }),
+    answer: text("answer").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("user_questionnaire_items_user_question_idx").on(
+      table.userId,
+      table.questionId,
+    ),
+    index("user_questionnaire_items_user_id_idx").on(table.userId),
+    index("user_questionnaire_items_question_id_idx").on(table.questionId),
+  ],
+);
 
 export const applicationStatusEnum = pgEnum("application_status", [
   "SAVED",
@@ -63,8 +161,7 @@ export const applications = pgTable(
   "applications",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    // Reserved for future multi-user ownership without a schema rewrite.
-    ownerId: text("owner_id"),
+    ownerId: uuid("owner_id").references(() => users.id, { onDelete: "cascade" }),
     company: text("company").notNull(),
     position: text("position").notNull(),
     location: text("location"),
@@ -79,7 +176,12 @@ export const applications = pgTable(
     description: text("description").notNull().default(""),
     applicationUrl: text("application_url"),
     source: text("source"),
+    questionAnswers: jsonb("question_answers")
+      .$type<Array<{ question: string; answer: string }>>()
+      .notNull()
+      .default([]),
     status: applicationStatusEnum("status").notNull().default("SAVED"),
+    ghosted: boolean("ghosted").notNull().default(false),
     appliedAt: timestamp("applied_at", { withTimezone: true }),
     lastActivityAt: timestamp("last_activity_at", { withTimezone: true })
       .notNull()
@@ -168,7 +270,48 @@ export const communications = pgTable(
   ],
 );
 
-export const applicationsRelations = relations(applications, ({ many }) => ({
+export const usersRelations = relations(users, ({ one, many }) => ({
+  profile: one(userProfiles, {
+    fields: [users.id],
+    references: [userProfiles.userId],
+  }),
+  applications: many(applications),
+  questionnaireItems: many(userQuestionnaireItems),
+}));
+
+export const userProfilesRelations = relations(userProfiles, ({ one }) => ({
+  user: one(users, {
+    fields: [userProfiles.userId],
+    references: [users.id],
+  }),
+}));
+
+export const questionnaireQuestionsRelations = relations(
+  questionnaireQuestions,
+  ({ many }) => ({
+    userItems: many(userQuestionnaireItems),
+  }),
+);
+
+export const userQuestionnaireItemsRelations = relations(
+  userQuestionnaireItems,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [userQuestionnaireItems.userId],
+      references: [users.id],
+    }),
+    question: one(questionnaireQuestions, {
+      fields: [userQuestionnaireItems.questionId],
+      references: [questionnaireQuestions.id],
+    }),
+  }),
+);
+
+export const applicationsRelations = relations(applications, ({ one, many }) => ({
+  owner: one(users, {
+    fields: [applications.ownerId],
+    references: [users.id],
+  }),
   skills: many(applicationSkills),
   events: many(applicationEvents),
   communications: many(communications),
@@ -201,6 +344,12 @@ export const communicationsRelations = relations(communications, ({ one }) => ({
   }),
 }));
 
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
+export type UserProfile = typeof userProfiles.$inferSelect;
+export type NewUserProfile = typeof userProfiles.$inferInsert;
+export type QuestionnaireQuestion = typeof questionnaireQuestions.$inferSelect;
+export type UserQuestionnaireItem = typeof userQuestionnaireItems.$inferSelect;
 export type Application = typeof applications.$inferSelect;
 export type NewApplication = typeof applications.$inferInsert;
 export type ApplicationSkill = typeof applicationSkills.$inferSelect;

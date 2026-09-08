@@ -9,12 +9,16 @@ import {
   createEvent,
   deleteApplication as deleteApplicationQuery,
   getApplication,
+  markStaleApplicationsGhosted,
   updateApplicationStatus as updateStatusQuery,
 } from "@/db/queries/applications";
 import {
   CLASSIFICATION_TO_EVENT,
   CLASSIFICATION_TO_STATUS,
 } from "@/lib/constants";
+import { GHOST_THRESHOLD_DAYS } from "@/lib/ghosted";
+import { getSession } from "@/lib/session";
+import { upsertQuestionsIntoBank } from "@/db/queries/questionnaire";
 import {
   addNoteSchema,
   applyEmailSchema,
@@ -67,7 +71,13 @@ export async function createApplicationAction(
     }
     const url = urlValue || null;
 
+    const session = await getSession();
+    if (!session?.userId) {
+      return { ok: false, error: "You must be signed in to save an application." };
+    }
+
     const created = await createApplicationQuery({
+      ownerId: session.userId,
       company: data.company,
       position: data.position,
       location: data.location ?? null,
@@ -85,10 +95,16 @@ export async function createApplicationAction(
       status: data.status,
       appliedAt: data.appliedAt ? new Date(data.appliedAt) : data.status === "APPLIED" ? new Date() : null,
       skills: data.skills,
+      questionAnswers: data.questionAnswers,
     });
+
+    if (data.questionAnswers.length) {
+      await upsertQuestionsIntoBank(data.questionAnswers);
+    }
 
     revalidatePath("/");
     revalidatePath("/applications");
+    revalidatePath("/questionnaire");
     return { ok: true, data: { id: created.id } };
   } catch (error) {
     return fail(error, "Unable to save the application. Please try again.");
@@ -99,8 +115,13 @@ export async function deleteApplicationAction(
   input: unknown,
 ): Promise<ActionResult<{ id: string }>> {
   try {
+    const session = await getSession();
+    if (!session?.userId) {
+      return { ok: false, error: "You must be signed in." };
+    }
+
     const { id } = z.object({ id: z.string().uuid() }).parse(input);
-    const existing = await getApplication(id);
+    const existing = await getApplication(id, session.userId);
     if (!existing) {
       return { ok: false, error: "Application not found." };
     }
@@ -123,8 +144,13 @@ export async function updateApplicationStatusAction(
   input: unknown,
 ): Promise<ActionResult<{ id: string }>> {
   try {
+    const session = await getSession();
+    if (!session?.userId) {
+      return { ok: false, error: "You must be signed in." };
+    }
+
     const data = updateStatusSchema.parse(input);
-    const existing = await getApplication(data.id);
+    const existing = await getApplication(data.id, session.userId);
     if (!existing) {
       return { ok: false, error: "Application not found." };
     }
@@ -147,8 +173,13 @@ export async function addNoteAction(
   input: unknown,
 ): Promise<ActionResult<{ id: string }>> {
   try {
+    const session = await getSession();
+    if (!session?.userId) {
+      return { ok: false, error: "You must be signed in." };
+    }
+
     const data = addNoteSchema.parse(input);
-    const existing = await getApplication(data.applicationId);
+    const existing = await getApplication(data.applicationId, session.userId);
     if (!existing) {
       return { ok: false, error: "Application not found." };
     }
@@ -167,8 +198,13 @@ export async function applyEmailAnalysisAction(
   input: unknown,
 ): Promise<ActionResult<{ id: string }>> {
   try {
+    const session = await getSession();
+    if (!session?.userId) {
+      return { ok: false, error: "You must be signed in." };
+    }
+
     const data = applyEmailSchema.parse(input);
-    const existing = await getApplication(data.applicationId);
+    const existing = await getApplication(data.applicationId, session.userId);
     if (!existing) {
       return { ok: false, error: "Application not found." };
     }
@@ -215,6 +251,34 @@ export async function applyEmailAnalysisAction(
     return { ok: true, data: { id: data.applicationId } };
   } catch (error) {
     return fail(error, "Unable to save the email analysis.");
+  }
+}
+
+export async function analyseGhostedApplicationsAction(): Promise<
+  ActionResult<{ marked: number; thresholdDays: number }>
+> {
+  try {
+    const session = await getSession();
+    if (!session?.userId) {
+      return { ok: false, error: "You must be signed in." };
+    }
+
+    const result = await markStaleApplicationsGhosted(session.userId);
+    revalidatePath("/");
+    revalidatePath("/applications");
+    for (const id of result.ids) {
+      revalidatePath(`/applications/${id}`);
+    }
+
+    return {
+      ok: true,
+      data: {
+        marked: result.marked,
+        thresholdDays: GHOST_THRESHOLD_DAYS,
+      },
+    };
+  } catch (error) {
+    return fail(error, "Unable to analyse applications for ghosting.");
   }
 }
 

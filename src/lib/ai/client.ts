@@ -36,7 +36,7 @@ type OpenRouterResponse = {
 };
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-const TIMEOUT_MS = 60_000;
+const TIMEOUT_MS = 180_000;
 
 export async function completeJson(params: {
   messages: ChatMessage[];

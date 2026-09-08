@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   APPLICATION_STATUSES,
   ALLOWED_IMAGE_TYPES,
@@ -21,6 +20,14 @@ import {
   REMOTE_LABELS,
 } from "@/lib/constants";
 import { nativeSelectClassName } from "@/lib/select-styles";
+
+type QuestionAnswer = { question: string; answer: string };
+
+type PastedImage = {
+  id: string;
+  file: File;
+  preview: string;
+};
 
 type ReviewState = {
   company: string;
@@ -39,9 +46,13 @@ type ReviewState = {
   applicationUrl: string;
   source: string;
   status: (typeof APPLICATION_STATUSES)[number];
+  questionAnswers: QuestionAnswer[];
 };
 
-function toReview(data: JobExtraction, extras: { url: string; source: string }): ReviewState {
+function toReview(
+  data: JobExtraction,
+  extras: { url: string; source: string },
+): ReviewState {
   return {
     company: data.company ?? "",
     position: data.position ?? "",
@@ -59,17 +70,32 @@ function toReview(data: JobExtraction, extras: { url: string; source: string }):
     applicationUrl: data.applicationUrl ?? extras.url,
     source: data.source ?? extras.source,
     status: "SAVED",
+    questionAnswers: data.questions ?? [],
   };
 }
 
 const selectClass = nativeSelectClassName;
 
+async function fileFromClipboardItem(item: DataTransferItem): Promise<File | null> {
+  if (!item.type.startsWith("image/")) return null;
+  const file = item.getAsFile();
+  return file;
+}
+
+function validateImage(file: File): string | null {
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type as (typeof ALLOWED_IMAGE_TYPES)[number])) {
+    return "Use JPEG, PNG, WebP, or GIF images.";
+  }
+  if (file.size > MAX_IMAGE_BYTES) {
+    return "Each image must be 5MB or smaller.";
+  }
+  return null;
+}
+
 export function JobAnalyzer() {
   const router = useRouter();
-  const [mode, setMode] = useState<"text" | "image">("text");
   const [text, setText] = useState("");
-  const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [images, setImages] = useState<PastedImage[]>([]);
   const [source, setSource] = useState("");
   const [applicationUrl, setApplicationUrl] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
@@ -78,29 +104,60 @@ export function JobAnalyzer() {
   const [review, setReview] = useState<ReviewState | null>(null);
   const [skillDraft, setSkillDraft] = useState("");
 
-  const canAnalyze = useMemo(() => {
-    if (mode === "text") return text.trim().length > 0;
-    return Boolean(file);
-  }, [mode, text, file]);
+  const canAnalyze = useMemo(
+    () => text.trim().length > 0 || images.length > 0,
+    [text, images],
+  );
 
-  function onFile(next: File | null) {
-    if (!next) {
-      setFile(null);
-      setPreview(null);
-      return;
+  function addFiles(files: File[]) {
+    const next: PastedImage[] = [];
+    for (const file of files) {
+      const validationError = validateImage(file);
+      if (validationError) {
+        toast.error(validationError);
+        continue;
+      }
+      next.push({
+        id: `${file.name}-${file.size}-${file.lastModified}-${crypto.randomUUID()}`,
+        file,
+        preview: URL.createObjectURL(file),
+      });
     }
-    if (!ALLOWED_IMAGE_TYPES.includes(next.type as (typeof ALLOWED_IMAGE_TYPES)[number])) {
-      toast.error("Upload a JPEG, PNG, WebP, or GIF image.");
-      return;
+    if (next.length) {
+      setImages((current) => [...current, ...next]);
     }
-    if (next.size > MAX_IMAGE_BYTES) {
-      toast.error("Image must be 5MB or smaller.");
-      return;
+  }
+
+  function removeImage(id: string) {
+    setImages((current) => {
+      const target = current.find((image) => image.id === id);
+      if (target) URL.revokeObjectURL(target.preview);
+      return current.filter((image) => image.id !== id);
+    });
+  }
+
+  async function onPaste(event: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const items = Array.from(event.clipboardData.items);
+    const imageFiles: File[] = [];
+
+    for (const item of items) {
+      const file = await fileFromClipboardItem(item);
+      if (file) imageFiles.push(file);
     }
-    setFile(next);
-    const reader = new FileReader();
-    reader.onload = () => setPreview(String(reader.result));
-    reader.readAsDataURL(next);
+
+    if (imageFiles.length) {
+      event.preventDefault();
+      const pastedText = event.clipboardData.getData("text");
+      if (pastedText) {
+        setText((current) => (current ? `${current}\n${pastedText}` : pastedText));
+      }
+      addFiles(imageFiles);
+      toast.success(
+        imageFiles.length === 1
+          ? "Image pasted"
+          : `${imageFiles.length} images pasted`,
+      );
+    }
   }
 
   async function analyze() {
@@ -111,7 +168,9 @@ export function JobAnalyzer() {
       form.set("text", text);
       form.set("source", source);
       form.set("applicationUrl", applicationUrl);
-      if (file) form.set("image", file);
+      for (const image of images) {
+        form.append("images", image.file);
+      }
 
       const response = await fetch("/api/ai/analyze-job", {
         method: "POST",
@@ -124,7 +183,12 @@ export function JobAnalyzer() {
             "Unable to analyze this job. Please try again or enter the details manually.",
         );
       }
-      setReview(toReview(payload.data as JobExtraction, { url: applicationUrl, source }));
+      setReview(
+        toReview(payload.data as JobExtraction, {
+          url: applicationUrl,
+          source,
+        }),
+      );
     } catch (err) {
       const message =
         err instanceof Error
@@ -146,12 +210,48 @@ export function JobAnalyzer() {
     setSkillDraft("");
   }
 
+  function updateQuestion(index: number, patch: Partial<QuestionAnswer>) {
+    if (!review) return;
+    setReview({
+      ...review,
+      questionAnswers: review.questionAnswers.map((item, i) =>
+        i === index ? { ...item, ...patch } : item,
+      ),
+    });
+  }
+
+  function removeQuestion(index: number) {
+    if (!review) return;
+    setReview({
+      ...review,
+      questionAnswers: review.questionAnswers.filter((_, i) => i !== index),
+    });
+  }
+
+  function addQuestion() {
+    if (!review) return;
+    setReview({
+      ...review,
+      questionAnswers: [
+        ...review.questionAnswers,
+        { question: "", answer: "" },
+      ],
+    });
+  }
+
   async function save() {
     if (!review) return;
     if (!review.company.trim() || !review.position.trim()) {
       toast.error("Company and position are required.");
       return;
     }
+    const questionAnswers = review.questionAnswers
+      .map((item) => ({
+        question: item.question.trim(),
+        answer: item.answer.trim(),
+      }))
+      .filter((item) => item.question && item.answer);
+
     setSaving(true);
     const result = await createApplicationAction({
       company: review.company,
@@ -170,6 +270,7 @@ export function JobAnalyzer() {
       source: review.source || null,
       status: review.status,
       skills: review.skills,
+      questionAnswers,
     });
     setSaving(false);
     if (!result.ok) {
@@ -184,9 +285,12 @@ export function JobAnalyzer() {
     return (
       <div className="grid gap-6">
         <div>
-          <h1 className="text-xl font-medium tracking-tight">Review extracted details</h1>
+          <h1 className="text-xl font-medium tracking-tight">
+            Review extracted details
+          </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Correct anything the AI missed, then save.
+            Correct anything the AI missed, then save. Question answers are based
+            on your profile resume data.
           </p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -371,6 +475,61 @@ export function JobAnalyzer() {
             onChange={(e) => setReview({ ...review, description: e.target.value })}
           />
         </Field>
+
+        <div className="grid gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-medium">Questions & answers</h2>
+              <p className="text-sm text-muted-foreground">
+                Drafted from your Complete resume data. Edit before saving.
+              </p>
+            </div>
+            <Button type="button" variant="outline" size="sm" onClick={addQuestion}>
+              Add question
+            </Button>
+          </div>
+          {review.questionAnswers.length === 0 ? (
+            <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+              No application questions were found in the job post.
+            </p>
+          ) : (
+            <div className="grid gap-4">
+              {review.questionAnswers.map((item, index) => (
+                <div key={index} className="grid gap-2 rounded-lg border p-4">
+                  <Field label={`Question ${index + 1}`}>
+                    <Textarea
+                      rows={2}
+                      value={item.question}
+                      onChange={(e) =>
+                        updateQuestion(index, { question: e.target.value })
+                      }
+                    />
+                  </Field>
+                  <Field label="Answer">
+                    <Textarea
+                      rows={4}
+                      value={item.answer}
+                      onChange={(e) =>
+                        updateQuestion(index, { answer: e.target.value })
+                      }
+                    />
+                  </Field>
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeQuestion(index)}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={() => setReview(null)} disabled={saving}>
             Back
@@ -388,42 +547,64 @@ export function JobAnalyzer() {
       <div>
         <h1 className="text-xl font-medium tracking-tight">Add application</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Paste a job description or upload a screenshot. AI extracts the details for review.
+          Paste the job description AND any application form questions (or
+          screenshots of the form). AI extracts the role and drafts answers from
+          your profile resume.
         </p>
       </div>
-      <Tabs value={mode} onValueChange={(value) => setMode(value as "text" | "image")}>
-        <TabsList>
-          <TabsTrigger value="text">Text</TabsTrigger>
-          <TabsTrigger value="image">Image</TabsTrigger>
-        </TabsList>
-        <TabsContent value="text">
+
+      <div className="grid gap-3">
+        <Field label="Job description & questions">
           <Textarea
             rows={14}
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="Paste job description..."
+            onPaste={onPaste}
+            placeholder="Paste job description here. If the application has essay questions (hardest project, inspiration, pitch, etc.), paste those too — or paste screenshots of the form (Ctrl/Cmd+V)."
           />
-        </TabsContent>
-        <TabsContent value="image" className="grid gap-3">
+        </Field>
+
+        <div className="flex flex-wrap items-center gap-2">
           <Input
             type="file"
             accept={ALLOWED_IMAGE_TYPES.join(",")}
-            onChange={(e) => onFile(e.target.files?.[0] ?? null)}
+            multiple
+            className="max-w-xs"
+            onChange={(e) => {
+              addFiles(Array.from(e.target.files ?? []));
+              e.target.value = "";
+            }}
           />
-          {preview ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={preview}
-              alt="Job description preview"
-              className="max-h-80 rounded-lg border object-contain"
-            />
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              JPEG, PNG, WebP, or GIF · max 5MB
-            </p>
-          )}
-        </TabsContent>
-      </Tabs>
+          <p className="text-sm text-muted-foreground">
+            Or paste images into the box · JPEG/PNG/WebP/GIF · max 5MB each
+          </p>
+        </div>
+
+        {images.length > 0 ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {images.map((image) => (
+              <div key={image.id} className="relative overflow-hidden rounded-lg border">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={image.preview}
+                  alt="Pasted job content"
+                  className="max-h-56 w-full object-contain bg-muted/30"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  className="absolute top-2 right-2"
+                  onClick={() => removeImage(image.id)}
+                >
+                  Remove
+                </Button>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Job URL (optional)">
           <Input
