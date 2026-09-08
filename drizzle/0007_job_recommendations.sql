@@ -1,4 +1,4 @@
-CREATE DO $$ BEGIN
+DO $$ BEGIN
   CREATE TYPE "public"."recommendation_status" AS ENUM('PENDING', 'DISMISSED', 'CONVERTED');
 EXCEPTION
   WHEN duplicate_object THEN null;
