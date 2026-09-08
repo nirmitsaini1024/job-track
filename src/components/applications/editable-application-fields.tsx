@@ -12,24 +12,29 @@ export function EditableApplicationFields({
   applicationId,
   company,
   applicationUrl,
+  employmentType,
 }: {
   applicationId: string;
   company: string;
   applicationUrl: string | null;
+  employmentType: string | null;
 }) {
   const [editing, setEditing] = useState(false);
   const [companyValue, setCompanyValue] = useState(company);
   const [urlValue, setUrlValue] = useState(applicationUrl ?? "");
+  const [employmentValue, setEmploymentValue] = useState(employmentType ?? "");
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
     setCompanyValue(company);
     setUrlValue(applicationUrl ?? "");
-  }, [company, applicationUrl]);
+    setEmploymentValue(employmentType ?? "");
+  }, [company, applicationUrl, employmentType]);
 
   function cancel() {
     setCompanyValue(company);
     setUrlValue(applicationUrl ?? "");
+    setEmploymentValue(employmentType ?? "");
     setEditing(false);
   }
 
@@ -41,7 +46,12 @@ export function EditableApplicationFields({
     }
 
     const nextUrl = urlValue.trim();
-    if (nextCompany === company && nextUrl === (applicationUrl ?? "")) {
+    const nextEmployment = employmentValue.trim();
+    if (
+      nextCompany === company &&
+      nextUrl === (applicationUrl ?? "") &&
+      nextEmployment === (employmentType ?? "")
+    ) {
       setEditing(false);
       return;
     }
@@ -51,6 +61,7 @@ export function EditableApplicationFields({
         id: applicationId,
         company: nextCompany,
         applicationUrl: nextUrl || null,
+        employmentType: nextEmployment || null,
       });
       if (!result.ok) {
         toast.error(result.error);
@@ -71,8 +82,8 @@ export function EditableApplicationFields({
             variant="ghost"
             size="icon-sm"
             className="size-6 shrink-0 text-muted-foreground"
-            aria-label="Edit company and link"
-            title="Edit company and link"
+            aria-label="Edit details"
+            title="Edit company, employment type, and link"
             onClick={() => setEditing(true)}
           >
             <Pencil className="size-3.5" />
@@ -127,6 +138,30 @@ export function EditableApplicationFields({
           />
         ) : (
           <p className="text-sm">{company}</p>
+        )}
+      </div>
+
+      <div className="grid gap-1">
+        <p className="text-xs font-medium text-muted-foreground">
+          Employment type
+        </p>
+        {editing ? (
+          <Input
+            value={employmentValue}
+            disabled={pending}
+            maxLength={100}
+            placeholder="Full-time, Internship…"
+            onChange={(event) => setEmploymentValue(event.currentTarget.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                save();
+              }
+              if (event.key === "Escape") cancel();
+            }}
+          />
+        ) : (
+          <p className="text-sm">{employmentType || "—"}</p>
         )}
       </div>
 

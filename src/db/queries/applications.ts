@@ -380,7 +380,11 @@ export async function updateApplication(
 
 export async function updateApplicationDetails(
   id: string,
-  input: { company: string; applicationUrl: string | null },
+  input: {
+    company: string;
+    applicationUrl: string | null;
+    employmentType: string | null;
+  },
 ) {
   const db = getDb();
   const [current] = await db
@@ -393,9 +397,11 @@ export async function updateApplicationDetails(
 
   const company = input.company.trim();
   const applicationUrl = input.applicationUrl?.trim() || null;
+  const employmentType = input.employmentType?.trim() || null;
   if (
     current.company === company &&
-    (current.applicationUrl ?? null) === applicationUrl
+    (current.applicationUrl ?? null) === applicationUrl &&
+    (current.employmentType ?? null) === employmentType
   ) {
     return serialize(current);
   }
@@ -406,6 +412,7 @@ export async function updateApplicationDetails(
     .set({
       company,
       applicationUrl,
+      employmentType,
       updatedAt: now,
     })
     .where(eq(applications.id, id))
@@ -422,6 +429,13 @@ export async function updateApplicationDetails(
         : "Application link cleared",
     );
   }
+  if ((current.employmentType ?? null) !== employmentType) {
+    changes.push(
+      employmentType
+        ? `Employment type updated to ${employmentType}`
+        : "Employment type cleared",
+    );
+  }
 
   if (changes.length) {
     await db.insert(applicationEvents).values({
@@ -432,6 +446,7 @@ export async function updateApplicationDetails(
         reason: "update_details",
         company,
         applicationUrl,
+        employmentType,
       },
     });
   }

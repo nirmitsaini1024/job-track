@@ -122,6 +122,9 @@ export const updateApplicationDetailsSchema = z.object({
   applicationUrl: z
     .union([z.string().trim().max(2000), z.literal(""), z.null()])
     .optional(),
+  employmentType: z
+    .union([z.string().trim().max(100), z.literal(""), z.null()])
+    .optional(),
 });
 
 export const unmarkGhostedSchema = z.object({

@@ -74,13 +74,10 @@ export function ApplicationDetail({ application }: { application: Detail }) {
               applicationId={application.id}
               company={application.company}
               applicationUrl={application.applicationUrl}
+              employmentType={application.employmentType}
             />
             <Separator />
             <div className="grid grid-cols-2 gap-4">
-              <Meta
-                label="Employment"
-                value={application.employmentType ?? "—"}
-              />
               <Meta
                 label="Remote"
                 value={REMOTE_LABELS[application.remoteType as RemoteType]}

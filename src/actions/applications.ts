@@ -237,6 +237,7 @@ export async function updateApplicationDetailsAction(
     const updated = await updateDetailsQuery(data.id, {
       company: data.company,
       applicationUrl: urlValue || null,
+      employmentType: data.employmentType?.trim() || null,
     });
     if (!updated) {
       return { ok: false, error: "Unable to update this application." };
