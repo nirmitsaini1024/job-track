@@ -44,23 +44,58 @@ function hasMeaningfulResponse(
   );
 }
 
-function reachedStatus(
+const PIPELINE_ORDER: ApplicationStatus[] = [
+  "SAVED",
+  "APPLIED",
+  "SCREENING",
+  "INTERVIEW",
+  "OFFER",
+];
+
+function statusRank(status: ApplicationStatus | string | undefined): number {
+  if (!status) return -1;
+  return PIPELINE_ORDER.indexOf(status as ApplicationStatus);
+}
+
+/** Highest pipeline stage implied by a single event. */
+function eventStatusRank(event: ApplicationEvent): number {
+  if (event.type === "INTERVIEW") return statusRank("INTERVIEW");
+  if (event.type === "OFFER") return statusRank("OFFER");
+  if (event.type === "STATUS_CHANGED") {
+    const to =
+      event.metadata && typeof event.metadata === "object"
+        ? (event.metadata as { to?: string }).to
+        : undefined;
+    return statusRank(to);
+  }
+  return -1;
+}
+
+/**
+ * Pipeline stage for funnel/rates.
+ * Active apps use current status only so mistaken status clicks
+ * (then corrected back) do not inflate Screening/Interview/Offer.
+ * Rejected/withdrawn apps keep their peak stage from history so
+ * real interviews that ended in rejection still count.
+ */
+function pipelineRank(app: Application, events: ApplicationEvent[]): number {
+  const current = statusRank(app.status);
+  if (app.status !== "REJECTED" && app.status !== "WITHDRAWN") {
+    return current;
+  }
+  let max = current;
+  for (const event of events) {
+    max = Math.max(max, eventStatusRank(event));
+  }
+  return max;
+}
+
+function reachedStage(
   app: Application,
   events: ApplicationEvent[],
   status: ApplicationStatus,
 ): boolean {
-  if (app.status === status) return true;
-  return events.some((event) => {
-    const to = event.metadata && typeof event.metadata === "object"
-      ? (event.metadata as { to?: string }).to
-      : undefined;
-    if (event.type === "STATUS_CHANGED" && to === status) return true;
-    if (status === "INTERVIEW" && event.type === "INTERVIEW") return true;
-    if (status === "OFFER" && event.type === "OFFER") return true;
-    if (status === "REJECTED" && event.type === "REJECTION") return true;
-    if (status === "SCREENING" && to === "SCREENING") return true;
-    return false;
-  });
+  return pipelineRank(app, events) >= statusRank(status);
 }
 
 export type DashboardStats = {
@@ -144,14 +179,9 @@ export async function getApplicationAnalytics(
     const appEvents = eventsByApp.get(app.id) ?? [];
     const appComms = commsByApp.get(app.id) ?? [];
     const responded = hasMeaningfulResponse(app, appEvents, appComms);
-    const reachedScreening =
-      reachedStatus(app, appEvents, "SCREENING") ||
-      reachedStatus(app, appEvents, "INTERVIEW") ||
-      reachedStatus(app, appEvents, "OFFER");
-    const reachedInterview =
-      reachedStatus(app, appEvents, "INTERVIEW") ||
-      reachedStatus(app, appEvents, "OFFER");
-    const reachedOffer = reachedStatus(app, appEvents, "OFFER");
+    const reachedScreening = reachedStage(app, appEvents, "SCREENING");
+    const reachedInterview = reachedStage(app, appEvents, "INTERVIEW");
+    const reachedOffer = reachedStage(app, appEvents, "OFFER");
 
     if (responded) responses += 1;
     if (reachedScreening) screenings += 1;
