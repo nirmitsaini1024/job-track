@@ -154,7 +154,9 @@ export async function getApplicationAnalytics(
   const commsByApp = groupBy(communications, (c) => c.applicationId);
 
   const total = applications.length;
-  const active = applications.filter((app) => isActiveStatus(app.status)).length;
+  const active = applications.filter(
+    (app) => isActiveStatus(app.status) && !isGhosted(app),
+  ).length;
   const rejected = applications.filter((app) => app.status === "REJECTED").length;
   const ghosted = applications.filter((app) => isGhosted(app)).length;
   const screeningCurrent = applications.filter(
